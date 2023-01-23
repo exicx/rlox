@@ -1,0 +1,7 @@
+// this is a comment
+(( )){} // grouping stuff
+!*+-/=<> <= == // operators
+
+var 900..;
+var 900.1.1;
+var 900.;

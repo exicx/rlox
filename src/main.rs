@@ -33,6 +33,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 // Lexes the scanner and evaluates input.
 fn run(scanner: &mut Scanner) -> Result<(), Box<dyn Error>> {
     scanner.scan_tokens()?;
+    // for token in &scanner.tokens {
+    //     println!("{:?}", token);
+    // }
     Ok(())
 }
 

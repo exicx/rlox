@@ -5,7 +5,7 @@ use std::fmt::Display;
 pub enum RloxError {
     CmdlineError(String),
     ScanError {
-        line: i32,
+        line: usize,
         help: String,
         message: String,
     },
