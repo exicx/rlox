@@ -4,7 +4,7 @@ use std::fmt::Display;
 #[allow(dead_code)]
 pub enum TokenType {
     // Single-character tokens.
-    LeftParen,
+    LeftParen(&'static str),
     RightParen,
     LeftBrace,
     RightBrace,
@@ -49,15 +49,15 @@ pub enum TokenType {
 }
 
 #[derive(Debug)]
-pub struct Token {
+pub struct Token<'a> {
     token_type: TokenType,
-    lexeme: String,
+    lexeme: &'a str,
     // literal: String,
     line: i32,
 }
 
-impl Token {
-    pub fn new(token_type: TokenType, lexeme: String, line: i32) -> Token {
+impl<'a> Token<'a> {
+    pub fn new(token_type: TokenType, lexeme: &'a str, line: i32) -> Token {
         Token {
             token_type,
             lexeme,
@@ -66,8 +66,8 @@ impl Token {
     }
 }
 
-impl Display for Token {
+impl<'a> Display for Token<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?} {}", self.token_type, &self.lexeme)
+        write!(f, "{:?} {}", self.token_type, self.lexeme)
     }
 }

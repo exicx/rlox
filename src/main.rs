@@ -8,31 +8,31 @@ mod scanner;
 mod tokens;
 
 use errors::RloxError;
+use scanner::Scanner;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let cmdline: Vec<String> = args().collect();
 
     match cmdline.len() {
+        // Too many arguments
         l if l > 2 => {
             eprintln!("Usage: rlox [script]");
             return Err(Box::new(RloxError::CmdlineError(String::from(
                 "Too many arguments.",
             ))));
         }
+        // Filename given
         l if l == 2 => run_file(&cmdline[1])?,
+        // No filename, run REPL
         _ => run_prompt()?,
     }
 
     Ok(())
 }
 
-fn run(buf: &str) -> Result<(), Box<dyn Error>> {
-    let scanner = scanner::Scanner::new(buf);
-
-    let tokens = scanner.scan_tokens()?;
-    for token in tokens {
-        println!("{}", token);
-    }
+// Lexes the scanner and evaluates input.
+fn run(scanner: &mut Scanner) -> Result<(), Box<dyn Error>> {
+    scanner.scan_tokens()?;
     Ok(())
 }
 
@@ -41,7 +41,9 @@ fn run_file(filename: &str) -> Result<(), Box<dyn Error>> {
     // scanner::Scanner::read_file(filename)?;
     let file_handle = File::open(filename)?;
     let buf = io::read_to_string(file_handle)?;
-    run(&buf)?;
+
+    let mut scanner = Scanner::new(&buf);
+    run(&mut scanner)?;
     Ok(())
 }
 
@@ -69,10 +71,13 @@ fn run_prompt() -> Result<(), Box<dyn Error>> {
             Err(e) => eprint!("{:?}", e),
         }
 
+        // Create a scanner from user's input
+        let mut scanner = Scanner::new(&buf);
+
         // Run user's input
         // Don't kill the user's session if they make a mistake.
         // Print the error.
-        let res = run(&buf);
+        let res = run(&mut scanner);
         if let Err(e) = res {
             println!("{}", e);
         }
