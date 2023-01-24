@@ -4,6 +4,7 @@ use std::fs::File;
 use std::io::{self, Write};
 
 mod errors;
+mod parser;
 mod scanner;
 mod tokens;
 
@@ -33,15 +34,11 @@ fn main() -> Result<(), Box<dyn Error>> {
 // Lexes the scanner and evaluates input.
 fn run(scanner: &mut Scanner) -> Result<(), Box<dyn Error>> {
     scanner.scan_tokens()?;
-    // for token in &scanner.tokens {
-    //     println!("{:?}", token);
-    // }
     Ok(())
 }
 
 // Reads a file in and runs it.
 fn run_file(filename: &str) -> Result<(), Box<dyn Error>> {
-    // scanner::Scanner::read_file(filename)?;
     let file_handle = File::open(filename)?;
     let buf = io::read_to_string(file_handle)?;
 

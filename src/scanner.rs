@@ -1,5 +1,6 @@
 use crate::errors;
 use crate::tokens::{Token, TokenType};
+use std::collections::HashMap;
 
 pub struct Scanner {
     source: Vec<char>,
@@ -8,10 +9,30 @@ pub struct Scanner {
     current: usize,
     line: usize,
     has_error: bool,
+    keywords: HashMap<String, TokenType>,
 }
 
 impl Scanner {
     pub fn new(source: &str) -> Scanner {
+        let mut keywords = HashMap::new();
+        keywords.insert("and".into(), TokenType::And);
+        keywords.insert("class".into(), TokenType::Class);
+        keywords.insert("else".into(), TokenType::Else);
+        keywords.insert("false".into(), TokenType::False);
+        keywords.insert("fun".into(), TokenType::Fun);
+        keywords.insert("for".into(), TokenType::For);
+        keywords.insert("if".into(), TokenType::If);
+        keywords.insert("nil".into(), TokenType::Nil);
+        keywords.insert("or".into(), TokenType::Or);
+        keywords.insert("print".into(), TokenType::Print);
+        keywords.insert("return".into(), TokenType::Return);
+        keywords.insert("super".into(), TokenType::Super);
+        keywords.insert("this".into(), TokenType::This);
+        keywords.insert("true".into(), TokenType::True);
+        keywords.insert("var".into(), TokenType::Var);
+        keywords.insert("while".into(), TokenType::While);
+        keywords.insert("eof".into(), TokenType::Eof);
+
         Scanner {
             source: source.chars().collect(),
             tokens: vec![],
@@ -19,6 +40,7 @@ impl Scanner {
             start: 0,
             current: 0,
             has_error: false,
+            keywords,
         }
     }
 
@@ -27,23 +49,20 @@ impl Scanner {
             self.start = self.current;
             let res = self.scan_token();
 
-            match res {
-                Some(token) => {
-                    self.tokens.push(Token::new(
-                        token,
-                        &self.source[self.start..self.current],
-                        self.line,
-                    ));
-                }
-                _ => {}
+            // Currently strings, numbers, and identifiers can add their own tokens
+            // Fix this in the future.
+            // Those tokens will return None from scan_token() so they're not added twice.
+            if let Some(token) = res {
+                self.add_token(&token);
             }
         }
 
         self.tokens.push(Token::new(TokenType::Eof, &[], self.line));
 
-        for token in &self.tokens {
-            println!("{:?}", token);
-        }
+        // Debugging, show tokens.
+        // for token in &self.tokens {
+        //     println!("{:?}", token);
+        // }
 
         Ok(())
     }
@@ -52,7 +71,7 @@ impl Scanner {
         let ch = self.advance()?;
 
         let token: Option<TokenType> = match ch {
-            // Single character
+            // Single character tokens
             '(' => Some(TokenType::LeftParen),
             ')' => Some(TokenType::RightParen),
             '{' => Some(TokenType::LeftBrace),
@@ -115,7 +134,19 @@ impl Scanner {
             '\r' => None,
 
             // Literals
-            // "" => Token::new(TokenType::Identifier, "", self.line),
+            // Identifiers and reserved keywords
+            'a'..='z' | 'A'..='Z' | '_' => {
+                let result = self.identifier();
+                match result {
+                    Ok(_) => None,
+                    Err(err) => {
+                        // This is weird. Fix this.
+                        eprintln!("{}", err);
+                        None
+                    }
+                }
+            }
+            // Strings
             '"' => {
                 let result = self.string();
                 match result {
@@ -127,6 +158,7 @@ impl Scanner {
                     }
                 }
             }
+            // Numbers
             '0'..='9' => {
                 let result = self.number();
                 match result {
@@ -138,27 +170,8 @@ impl Scanner {
                     }
                 }
             }
-
-            // Keywords
-            // "and" => Token::new(TokenType::And, "and", self.line),
-            // "class" => Token::new(TokenType::Class, "class", self.line),
-            // "else" => Token::new(TokenType::Else, "else", self.line),
-            // "false" => Token::new(TokenType::False, "false", self.line),
-            // "fun" => Token::new(TokenType::Fun, "fun", self.line),
-            // "for" => Token::new(TokenType::For, "for", self.line),
-            // "if" => Token::new(TokenType::If, "if", self.line),
-            // "nil" => Token::new(TokenType::Nil, "nil", self.line),
-            // "or" => Token::new(TokenType::Or, "or", self.line),
-            // "print" => Token::new(TokenType::Print, "print", self.line),
-            // "return" => Token::new(TokenType::Return, "return", self.line),
-            // "super" => Token::new(TokenType::Super, "super", self.line),
-            // "this" => Token::new(TokenType::This, "this", self.line),
-            // "true" => Token::new(TokenType::True, "true", self.line),
-            // "var" => Token::new(TokenType::Var, "var", self.line),
-            // "while" => Token::new(TokenType::While, "while", self.line),
-            // "eof" => Token::new(TokenType::Eof, "eof", self.line),
             _x => {
-                println!("Implement me. :::: {}", _x);
+                println!("[line {}] Token not supported. {}.", self.line, _x);
                 None
             }
         };
@@ -205,25 +218,26 @@ impl Scanner {
         self.advance(); // consume ending quote
 
         // Trim surrounding quotes of string literal.
-        self.tokens.push(Token::new(
-            TokenType::String,
-            &self.source[(self.start + 1)..(self.current - 1)],
-            self.line,
-        ));
+        // self.tokens.push(Token::new(
+        //     TokenType::String,
+        //     &self.source[(self.start + 1)..(self.current - 1)],
+        //     self.line,
+        // ));
+        self.add_token(&TokenType::String);
 
         Ok(())
     }
 
     fn number(&mut self) -> Result<(), String> {
         let mut decimal = false;
-        let mut res = Ok(());
+        let mut res: Result<(), String> = Ok(());
 
         while self.peek_is_digit().is_some() && !self.is_at_end() {
             match self.peek().unwrap() {
                 '0'..='9' => {}
                 '.' => {
                     // we can only have 1 decimal point in a number
-                    if decimal == true {
+                    if decimal {
                         res = Err("Too many decimals".into());
                     }
                     decimal = true;
@@ -241,17 +255,20 @@ impl Scanner {
             self.advance();
         }
 
-        if res.is_err() {
-            return res;
-        }
+        // return error if any
+        res.as_ref()?;
 
+        self.add_token(&TokenType::Number);
+
+        Ok(())
+    }
+
+    fn add_token(&mut self, token: &TokenType) {
         self.tokens.push(Token::new(
-            TokenType::Number,
+            token.clone(),
             &self.source[self.start..self.current],
             self.line,
         ));
-
-        Ok(())
     }
 
     fn peek_is_digit(&self) -> Option<bool> {
@@ -262,15 +279,69 @@ impl Scanner {
             _ => None,
         }
     }
+
+    // a-z, A-Z, 0-9, _
+    // This also accepts unicode alphanumeric code points, but that's okay for us for now.
+    fn is_alpha_numeric(&self, ch: Option<char>) -> bool {
+        if ch.is_none() {
+            return false;
+        }
+        let ch = ch.unwrap();
+        ch.is_alphanumeric() || ch == '_'
+    }
+
+    fn identifier(&mut self) -> Result<(), String> {
+        while self.is_alpha_numeric(self.peek()) {
+            self.advance();
+        }
+        let substring: String = self.source[self.start..self.current].iter().collect();
+        let keyword = self.keywords.get(&substring);
+
+        // If the identifier exists in our hashmap of keywords, then treat it like a keyword
+        if let Some(token) = keyword {
+            let token = token.clone();
+            self.add_token(&token);
+        } else {
+            // Otherwise it's an identifier and we lex it as such.
+            self.add_token(&TokenType::Identifier);
+        }
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tokens::*;
+
+    fn setup_scanner1() -> Scanner {
+        let mut scanner = Scanner::new(
+            r#"
+            // this is a comment
+            var andy = 10;
+            var jonny = 3;
+            if (andy and jonny) { print "Hello World" + (andy+jonny) };
+            "#,
+        );
+        scanner.scan_tokens().unwrap();
+        scanner
+    }
 
     #[test]
     fn match_next_test() {
-        let mut scanner = Scanner::new("// this is a comment");
+        let scanner = setup_scanner1();
+    }
+
+    #[test]
+    fn test_and_token() {
+        let mut scanner = Scanner::new("var andy = 20; if (andy or 0) { print \"fail\"; }");
         scanner.scan_tokens().unwrap();
+
+        for token in scanner.tokens {
+            if token.token_type() == &TokenType::And {
+                panic!("Unexpected \"AND\" token in program.");
+            }
+        }
     }
 }
