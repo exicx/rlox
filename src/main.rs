@@ -9,6 +9,7 @@ mod scanner;
 mod tokens;
 
 use errors::RloxError;
+use parser::Parser;
 use scanner::Scanner;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -18,7 +19,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         // Too many arguments
         l if l > 2 => {
             eprintln!("Usage: rlox [script]");
-            return Err(Box::new(RloxError::CmdlineError(String::from(
+            return Err(Box::new(RloxError::Cmdline(String::from(
                 "Too many arguments.",
             ))));
         }
@@ -34,6 +35,12 @@ fn main() -> Result<(), Box<dyn Error>> {
 // Lexes the scanner and evaluates input.
 fn run(scanner: &mut Scanner) -> Result<(), Box<dyn Error>> {
     scanner.scan_tokens()?;
+    let mut p = Parser::new(scanner.get_tokens());
+
+    if let Some(expr) = p.parse() {
+        println!("{expr:?}");
+    }
+
     Ok(())
 }
 
@@ -65,10 +72,10 @@ fn run_prompt() -> Result<(), Box<dyn Error>> {
         // Break out of the REPL when Control-D is pressed.
         match line {
             Ok(0) => break,
-            Ok(1) => print!("\nUse ^D to close REPL."),
+            Ok(1) => println!("\nUse ^D to close REPL."),
             Ok(_) => (),
             // Ignore any errors for now.
-            Err(e) => eprint!("{:?}", e),
+            Err(e) => eprint!("{e:?}"),
         }
 
         // Create a scanner from user's input
@@ -79,7 +86,7 @@ fn run_prompt() -> Result<(), Box<dyn Error>> {
         // Print the error.
         let res = run(&mut scanner);
         if let Err(e) = res {
-            println!("{}", e);
+            println!("{e}");
         }
     }
 

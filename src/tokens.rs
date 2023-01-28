@@ -47,14 +47,14 @@ pub enum TokenType {
     Eof,
 }
 
-#[derive(Debug)]
-enum TokenLiteral {
+#[derive(Debug, Clone, PartialEq)]
+pub enum TokenLiteral {
     Str(String),
     Number(f64),
     None,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Token {
     token_type: TokenType,
     lexeme: String,
@@ -86,6 +86,10 @@ impl Token {
 
     pub fn token_type(&self) -> &TokenType {
         &self.token_type
+    }
+
+    pub fn token_literal(&self) -> &TokenLiteral {
+        &self.literal
     }
 }
 

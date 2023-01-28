@@ -141,7 +141,7 @@ impl Scanner {
                     Ok(_) => None,
                     Err(err) => {
                         // This is weird. Fix this.
-                        eprintln!("{}", err);
+                        eprintln!("{err}");
                         None
                     }
                 }
@@ -153,7 +153,7 @@ impl Scanner {
                     Ok(_) => None,
                     Err(err) => {
                         // This is weird. Fix this.
-                        eprintln!("{}", err);
+                        eprintln!("{err}");
                         None
                     }
                 }
@@ -307,6 +307,10 @@ impl Scanner {
         }
 
         Ok(())
+    }
+
+    pub fn get_tokens(&self) -> &[Token] {
+        &self.tokens
     }
 }
 
