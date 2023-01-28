@@ -3,5 +3,5 @@
 version = 3
 
 [[package]]
-name = "interpreter1"
-version = "0.1.0"
+name = "rlox"
+version = "0.2.0"

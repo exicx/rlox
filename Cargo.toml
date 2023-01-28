@@ -1,7 +1,15 @@
 [package]
-name = "interpreter1"
-version = "0.1.0"
+name = "rlox"
+authors = ["James Smith <j@mes.sh>"]
+version = "0.2.0"
 edition = "2021"
+description = "rlox: interpreter/compiler of the lox language"
+readme = "README.md"
+license-file = "LICENSE.txt"
+keywords = ["language", "lox"]
+publish = false
+repository = "https://gitlab.com/exicx/rlox"
+rust-version = "1.56"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
