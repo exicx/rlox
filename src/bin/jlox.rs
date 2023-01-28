@@ -19,28 +19,23 @@ use std::error::Error;
 use std::fs::File;
 use std::io::{self, Write};
 
-mod errors;
-mod parser;
-mod scanner;
-mod tokens;
-
-use errors::RloxError;
-use parser::Parser;
-use scanner::Scanner;
+use rlox::errors::RloxError;
+use rlox::parser::Parser;
+use rlox::scanner::Scanner;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let cmdline: Vec<String> = args().collect();
 
     match cmdline.len() {
         // Too many arguments
-        l if l > 2 => {
-            eprintln!("Usage: rlox [script]");
+        len if len > 2 => {
+            eprintln!("Usage: jlox [script]");
             return Err(Box::new(RloxError::Cmdline(String::from(
                 "Too many arguments.",
             ))));
         }
         // Filename given
-        l if l == 2 => run_file(&cmdline[1])?,
+        len if len == 2 => run_file(&cmdline[1])?,
         // No filename, run REPL
         _ => run_prompt()?,
     }
