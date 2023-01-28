@@ -8,7 +8,6 @@ pub struct Scanner {
     start: usize,
     current: usize,
     line: usize,
-    has_error: bool,
     keywords: HashMap<String, TokenType>,
 }
 
@@ -39,7 +38,6 @@ impl Scanner {
             line: 1,
             start: 0,
             current: 0,
-            has_error: false,
             keywords,
         }
     }
@@ -330,11 +328,6 @@ mod tests {
         );
         scanner.scan_tokens().unwrap();
         scanner
-    }
-
-    #[test]
-    fn match_next_test() {
-        let scanner = setup_scanner1();
     }
 
     #[test]

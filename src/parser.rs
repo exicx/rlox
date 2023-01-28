@@ -1,15 +1,6 @@
 mod ast {
     use crate::tokens::Token;
 
-    pub enum Stmt {
-        Expr(Expr),
-        Let(Name, Expr),
-    }
-
-    pub struct Name {
-        value: String,
-    }
-
     #[derive(Debug)]
     pub enum ExprLiteral {
         True,
@@ -28,16 +19,7 @@ mod ast {
     }
 }
 
-mod visit {
-    pub trait Visitor<T> {
-        fn visit_name() -> T;
-        fn visit_stmt() -> T;
-        fn visit_expr() -> T;
-    }
-}
-
-use self::ast::{Expr, ExprLiteral, Name, Stmt};
-use self::visit::Visitor;
+use self::ast::{Expr, ExprLiteral};
 use crate::errors::{self, RloxError};
 use crate::tokens::{Token, TokenLiteral, TokenType};
 
