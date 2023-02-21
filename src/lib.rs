@@ -1,3 +1,4 @@
+// rlox: Lox interpreter/compiler in Rust.
 //    Copyright 2023 James Smith <j@mes.sh>
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
