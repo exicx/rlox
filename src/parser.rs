@@ -35,8 +35,10 @@ mod ast {
 }
 
 use self::ast::{Expr, ExprLiteral};
-use crate::errors::{self, RloxError};
+use crate::errors::RloxError;
 use crate::tokens::{Token, TokenLiteral, TokenType};
+
+type Result<T> = std::result::Result<T, RloxError>;
 
 pub struct Parser {
     tokens: Vec<Token>,
@@ -44,14 +46,12 @@ pub struct Parser {
 }
 
 impl Parser {
-    pub fn new(tokens: &[Token]) -> Self {
-        Parser {
-            tokens: tokens.to_vec(),
-            current: 0,
-        }
+    pub fn new(tokens: Vec<Token>) -> Self {
+        Self { tokens, current: 0 }
     }
 
     // Build up the AST by precendence
+    // Parser methods
 
     pub fn parse(&mut self) -> Option<Expr> {
         if let Ok(expr) = self.expression() {
@@ -61,16 +61,18 @@ impl Parser {
         }
     }
 
-    fn expression(&mut self) -> Result<Expr, errors::RloxError> {
+    fn expression(&mut self) -> Result<Expr> {
         let expr = self.equality();
-        if let Err(err) = expr.as_ref() {
-            eprintln!("Error:: {err:?}");
+        if let Err(_err) = expr.as_ref() {
+            // TODO: This isn't always a fatal error.
+            // Look into this again.
+            eprintln!("Error::{_err:?}");
             self.synchronize();
         }
         expr
     }
 
-    fn equality(&mut self) -> Result<Expr, errors::RloxError> {
+    fn equality(&mut self) -> Result<Expr> {
         let mut expr = self.comparison()?;
 
         // Loop over equality expression, building up the AST with recursive Binary Expressions
@@ -84,7 +86,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn comparison(&mut self) -> Result<Expr, errors::RloxError> {
+    fn comparison(&mut self) -> Result<Expr> {
         let mut expr = self.term()?;
 
         while self.is_any_tokens(&[
@@ -101,7 +103,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn term(&mut self) -> Result<Expr, errors::RloxError> {
+    fn term(&mut self) -> Result<Expr> {
         let mut expr = self.factor()?;
 
         while self.is_any_tokens(&[TokenType::Plus, TokenType::Minus]) {
@@ -113,7 +115,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn factor(&mut self) -> Result<Expr, errors::RloxError> {
+    fn factor(&mut self) -> Result<Expr> {
         let mut expr = self.unary()?;
 
         while self.is_any_tokens(&[TokenType::Star, TokenType::Slash]) {
@@ -125,7 +127,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn unary(&mut self) -> Result<Expr, errors::RloxError> {
+    fn unary(&mut self) -> Result<Expr> {
         if self.is_any_tokens(&[TokenType::Minus, TokenType::Bang]) {
             let operator = self.previous().clone();
             let rhs = self.unary()?;
@@ -135,7 +137,7 @@ impl Parser {
         self.primary()
     }
 
-    fn primary(&mut self) -> Result<Expr, errors::RloxError> {
+    fn primary(&mut self) -> Result<Expr> {
         if self.is_any_tokens(&[TokenType::False]) {
             return Ok(Expr::Literal(ExprLiteral::False));
         }
@@ -168,10 +170,15 @@ impl Parser {
             return Ok(Expr::Grouping(Box::new(expr)));
         }
 
-        Err(errors::RloxError::Parse(
-            "Unexpected token in this scope.".into(),
-        ))
+        // Some kind of unexpected error.
+        // TODO: Try to be smarter here.
+        Err(RloxError::Parse(format!(
+            "Unexpected token \"{}\" in this scope.",
+            self.peek()
+        )))
     }
+
+    // Helper functions
 
     fn is_any_tokens(&mut self, tokens: &[TokenType]) -> bool {
         for token in tokens {
@@ -190,12 +197,12 @@ impl Parser {
         self.previous()
     }
 
-    fn consume(&mut self, token_type: &TokenType, msg: String) -> Result<&Token, RloxError> {
+    fn consume(&mut self, token_type: &TokenType, msg: String) -> Result<&Token> {
         if self.check(token_type) {
             return Ok(self.advance());
         }
 
-        Err(errors::RloxError::Parse(msg))
+        Err(RloxError::Parse(msg))
     }
 
     fn is_at_end(&self) -> bool {
@@ -217,6 +224,9 @@ impl Parser {
     fn synchronize(&mut self) {
         self.advance();
         while !self.is_at_end() {
+            // Continue scanning forward until we reach a SemiColon
+            // or a keyword. This lets us get past a syntax error and
+            // continue parsing.
             if self.previous().token_type() == &TokenType::Semicolon {
                 return;
             }
@@ -251,7 +261,7 @@ mod tests {
     }
 
     fn get_parser_scanner(opt: Option<&str>) -> Parser {
-        Parser::new(get_scanner(opt).get_tokens())
+        get_scanner(opt).into_parser()
     }
 
     #[test]
