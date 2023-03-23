@@ -16,6 +16,9 @@
 use crate::errors;
 use crate::tokens::{Token, TokenType};
 use std::collections::HashMap;
+use std::fmt::Write;
+
+use crate::parser::Parser;
 
 pub struct Scanner {
     source: Vec<char>,
@@ -26,8 +29,8 @@ pub struct Scanner {
     keywords: HashMap<String, TokenType>,
 }
 
-impl Scanner {
-    pub fn new(source: &str) -> Scanner {
+impl Default for Scanner {
+    fn default() -> Self {
         let mut keywords = HashMap::new();
         keywords.insert("and".into(), TokenType::And);
         keywords.insert("class".into(), TokenType::Class);
@@ -47,13 +50,35 @@ impl Scanner {
         keywords.insert("while".into(), TokenType::While);
         keywords.insert("eof".into(), TokenType::Eof);
 
-        Scanner {
-            source: source.chars().collect(),
+        Self {
+            source: Vec::new(),
             tokens: vec![],
             line: 1,
             start: 0,
             current: 0,
             keywords,
+        }
+    }
+}
+
+impl std::fmt::Debug for Scanner {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut debugOut: String = String::new();
+        debugOut.write_str("Scanner: \n").unwrap();
+
+        for sc in &self.tokens {
+            debugOut.write_fmt(format_args!("\t{sc}\n")).unwrap();
+        }
+
+        write!(f, "{debugOut}")
+    }
+}
+
+impl Scanner {
+    pub fn new(source: &str) -> Scanner {
+        Scanner {
+            source: source.chars().collect(),
+            ..Default::default()
         }
     }
 
@@ -71,11 +96,6 @@ impl Scanner {
         }
 
         self.tokens.push(Token::new(TokenType::Eof, &[], self.line));
-
-        // Debugging, show tokens.
-        // for token in &self.tokens {
-        //     println!("{:?}", token);
-        // }
 
         Ok(())
     }
@@ -322,8 +342,8 @@ impl Scanner {
         Ok(())
     }
 
-    pub fn get_tokens(&self) -> &[Token] {
-        &self.tokens
+    pub fn into_parser(self) -> Parser {
+        Parser::new(self.tokens)
     }
 }
 
