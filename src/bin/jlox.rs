@@ -42,12 +42,17 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-// Lexes the scanner and evaluates input.
-fn run(scanner: &mut Scanner) -> Result<(), Box<dyn Error>> {
+// Scans, Parses, and evaluates input.
+fn run(input: &str) -> Result<(), Box<dyn Error>> {
+    // TODO: Clean this up.
+    let mut scanner = Scanner::new(&input);
     scanner.scan_tokens()?;
-    let mut p = Parser::new(scanner.get_tokens());
 
-    if let Some(expr) = p.parse() {
+    println!("{scanner:?}");
+
+    let mut p = scanner.into_parser();
+
+    while let Some(expr) = p.parse() {
         println!("{expr:?}");
     }
 
@@ -59,8 +64,7 @@ fn run_file(filename: &str) -> Result<(), Box<dyn Error>> {
     let file_handle = File::open(filename)?;
     let buf = io::read_to_string(file_handle)?;
 
-    let mut scanner = Scanner::new(&buf);
-    run(&mut scanner)?;
+    run(&buf)?;
     Ok(())
 }
 
@@ -88,13 +92,10 @@ fn run_prompt() -> Result<(), Box<dyn Error>> {
             Err(e) => eprint!("{e:?}"),
         }
 
-        // Create a scanner from user's input
-        let mut scanner = Scanner::new(&buf);
-
         // Run user's input
         // Don't kill the user's session if they make a mistake.
         // Print the error.
-        let res = run(&mut scanner);
+        let res = run(&buf);
         if let Err(e) = res {
             println!("{e}");
         }
