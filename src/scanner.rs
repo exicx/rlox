@@ -13,13 +13,17 @@
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
 
-use crate::errors;
-use crate::tokens::{Token, TokenType};
 use std::collections::HashMap;
-use std::fmt::Write;
+use std::fmt::{self, Write};
 
+use crate::errors;
 use crate::parser::Parser;
+use crate::tokens::{Token, TokenType};
 
+// TODO: We can turn the Scanner into an iterator so Parser can operate on it.
+// TODO: We're not using line numbers as much as we could be for errors.
+// TODO: We're not really using errors very well either.
+// Nevertheless, the scanner is 'complete'.
 pub struct Scanner {
     source: Vec<char>,
     tokens: Vec<Token>,
@@ -61,8 +65,8 @@ impl Default for Scanner {
     }
 }
 
-impl std::fmt::Debug for Scanner {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Debug for Scanner {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut debug_out: String = String::new();
         debug_out.write_str("Scanner: \n").unwrap();
 
@@ -103,7 +107,7 @@ impl Scanner {
     fn scan_token(&mut self) -> Option<TokenType> {
         let ch = self.advance()?;
 
-        let token: Option<TokenType> = match ch {
+        let token: Option<TokenType> = match *ch {
             // Single character tokens
             '(' => Some(TokenType::LeftParen),
             ')' => Some(TokenType::RightParen),
@@ -115,9 +119,9 @@ impl Scanner {
             '+' => Some(TokenType::Plus),
             ';' => Some(TokenType::Semicolon),
             '/' => {
-                if self.match_next_char('/') {
+                if self.match_next_char(&'/') {
                     // Read ahead to end of line
-                    while self.peek() != Some('\n') && !self.is_at_end() {
+                    while self.peek() != Some(&'\n') && !self.is_at_end() {
                         self.advance();
                     }
                     None
@@ -129,28 +133,28 @@ impl Scanner {
 
             // One or two character tokens
             '!' => {
-                if self.match_next_char('=') {
+                if self.match_next_char(&'=') {
                     Some(TokenType::BangEqual)
                 } else {
                     Some(TokenType::Bang)
                 }
             }
             '=' => {
-                if self.match_next_char('=') {
+                if self.match_next_char(&'=') {
                     Some(TokenType::EqualEqual)
                 } else {
                     Some(TokenType::Equal)
                 }
             }
             '>' => {
-                if self.match_next_char('=') {
+                if self.match_next_char(&'=') {
                     Some(TokenType::GreaterEqual)
                 } else {
                     Some(TokenType::Greater)
                 }
             }
             '<' => {
-                if self.match_next_char('=') {
+                if self.match_next_char(&'=') {
                     Some(TokenType::LessEqual)
                 } else {
                     Some(TokenType::Less)
@@ -173,7 +177,7 @@ impl Scanner {
                 match result {
                     Ok(_) => None,
                     Err(err) => {
-                        // This is weird. Fix this.
+                        // TODO: This is weird. Fix this.
                         eprintln!("{err}");
                         None
                     }
@@ -185,7 +189,7 @@ impl Scanner {
                 match result {
                     Ok(_) => None,
                     Err(err) => {
-                        // This is weird. Fix this.
+                        // TODO: This is weird. Fix this.
                         eprintln!("{err}");
                         None
                     }
@@ -197,13 +201,14 @@ impl Scanner {
                 match result {
                     Ok(_) => None,
                     Err(err) => {
-                        // This is weird. Fix this.
+                        // TODO: This is weird. Fix this.
                         eprintln!("[line {}] {}", self.line, err);
                         None
                     }
                 }
             }
             _x => {
+                // TODO: Proper error type and handling here.
                 println!("[line {}] Token not supported. {}.", self.line, _x);
                 None
             }
@@ -212,23 +217,26 @@ impl Scanner {
         token
     }
 
+    // Helper functions
+
+    // TODO: XXX: Replace these with iterator
     fn is_at_end(&self) -> bool {
         self.current >= self.source.len()
     }
 
-    fn peek(&self) -> Option<char> {
-        self.source.get(self.current).cloned()
+    fn peek(&self) -> Option<&char> {
+        self.source.get(self.current)
     }
 
-    fn advance(&mut self) -> Option<char> {
-        let peek = self.peek();
-        if peek.is_some() {
+    // problem here. we're advancing current before getting it
+    fn advance(&mut self) -> Option<&char> {
+        if self.peek().is_some() {
             self.current += 1;
         }
-        peek
+        self.peek()
     }
 
-    fn match_next_char(&mut self, ch: char) -> bool {
+    fn match_next_char(&mut self, ch: &char) -> bool {
         if self.peek() != Some(ch) {
             return false;
         }
@@ -237,14 +245,15 @@ impl Scanner {
     }
 
     fn string(&mut self) -> Result<(), String> {
-        while self.peek() != Some('"') && !self.is_at_end() {
-            if self.peek() == Some('\n') {
+        while self.peek() != Some(&'"') && !self.is_at_end() {
+            if self.peek() == Some(&'\n') {
                 self.line += 1;
             }
             self.advance();
         }
 
         if self.is_at_end() {
+            // TODO: Error type here
             return Err("Unterminated String".into());
         }
 
@@ -298,7 +307,7 @@ impl Scanner {
 
     fn add_token(&mut self, token: &TokenType) {
         self.tokens.push(Token::new(
-            token.clone(),
+            *token,
             &self.source[self.start..self.current],
             self.line,
         ));
@@ -315,12 +324,12 @@ impl Scanner {
 
     // a-z, A-Z, 0-9, _
     // This also accepts unicode alphanumeric code points, but that's okay for us for now.
-    fn is_alpha_numeric(&self, ch: Option<char>) -> bool {
+    fn is_alpha_numeric(&self, ch: Option<&char>) -> bool {
         if ch.is_none() {
             return false;
         }
         let ch = ch.unwrap();
-        ch.is_alphanumeric() || ch == '_'
+        ch.is_alphanumeric() || ch == &'_'
     }
 
     fn identifier(&mut self) -> Result<(), String> {
@@ -332,7 +341,7 @@ impl Scanner {
 
         // If the identifier exists in our hashmap of keywords, then treat it like a keyword
         if let Some(token) = keyword {
-            let token = token.clone();
+            let token = *token;
             self.add_token(&token);
         } else {
             // Otherwise it's an identifier and we lex it as such.

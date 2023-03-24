@@ -35,19 +35,18 @@ impl ExprResult {
 
 impl fmt::Display for ExprResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let out: String = match self {
+        match self {
             ExprResult::Bool(v) => {
                 if *v {
-                    "true".into()
+                    write!(f, "true")
                 } else {
-                    "false".into()
+                    write!(f, "false")
                 }
             }
-            ExprResult::Nil => "nil".into(),
-            ExprResult::Number(n) => n.to_string(),
-            ExprResult::LoxString(s) => s.clone(),
-        };
-        write!(f, "{}", out)
+            ExprResult::Nil => write!(f, "nil"),
+            ExprResult::Number(n) => write!(f, "{}", n),
+            ExprResult::LoxString(s) => write!(f, "{s}"),
+        }
     }
 }
 

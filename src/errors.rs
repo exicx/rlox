@@ -22,6 +22,10 @@ pub enum ParseError {
     EOF,
 }
 
+pub enum RuntimeError {
+    // TODO: runtime errors here.
+}
+
 #[derive(Debug)]
 pub enum RloxError {
     Cmdline(String),
@@ -31,7 +35,7 @@ pub enum RloxError {
         message: String,
     },
     Parse(ParseError),
-    Interpret(String),
+    Interpret(String), // TODO: More specific errors here.
 }
 
 impl fmt::Display for RloxError {

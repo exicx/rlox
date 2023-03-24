@@ -52,28 +52,28 @@ impl Parser {
 
     // Build up the AST by precendence
     // Parser methods
-
     pub fn parse(&mut self) -> Option<Expr> {
-        if let Ok(expr) = self.expression() {
-            Some(expr)
-        } else {
-            None
+        match self.expression() {
+            Ok(expr) => Some(expr),
+            Err(err) => {
+                // TODO: This isn't always a fatal error.
+                // TODO: It's weird that error messages get printed from here, right?
+                // Look into this again.
+                match err {
+                    RloxError::Parse(ParseError::EOF) => (),
+                    RloxError::Parse(err) => {
+                        eprintln!("Error::{err:?}");
+                    }
+                    _ => (),
+                }
+                None
+            }
         }
     }
 
     fn expression(&mut self) -> Result<Expr> {
         let expr = self.equality();
         if let Err(_err) = expr.as_ref() {
-            // TODO: This isn't always a fatal error.
-            // TODO: It's weird that error messages get printed from here, right?
-            // Look into this again.
-            match _err {
-                RloxError::Parse(ParseError::EOF) => (),
-                RloxError::Parse(err) => {
-                    eprintln!("Error::{err:?}");
-                }
-                _ => (),
-            }
             self.synchronize();
         }
         expr
@@ -85,9 +85,9 @@ impl Parser {
         // Loop over equality expression, building up the AST with recursive Binary Expressions
         // a == b == c == d == e != f ...
         while self.is_any_tokens(&[TokenType::EqualEqual, TokenType::BangEqual]) {
-            let operator = self.previous().clone(); // one of ==, !=
+            let operator = *self.previous().token_type(); // one of ==, !=
             let rhs = self.comparison()?;
-            expr = Expr::Binary(Box::new(expr), *operator.token_type(), Box::new(rhs));
+            expr = Expr::Binary(Box::new(expr), operator, Box::new(rhs));
         }
 
         Ok(expr)
@@ -102,9 +102,9 @@ impl Parser {
             TokenType::Less,
             TokenType::LessEqual,
         ]) {
-            let operator = self.previous().clone(); // one of >, >=, <, <+
+            let operator = *self.previous().token_type(); // one of >, >=, <, <+
             let rhs = self.term()?;
-            expr = Expr::Binary(Box::new(expr), *operator.token_type(), Box::new(rhs));
+            expr = Expr::Binary(Box::new(expr), operator, Box::new(rhs));
         }
 
         Ok(expr)
@@ -114,9 +114,9 @@ impl Parser {
         let mut expr = self.factor()?;
 
         while self.is_any_tokens(&[TokenType::Plus, TokenType::Minus]) {
-            let operator = self.previous().clone(); // one of +, -
+            let operator = *self.previous().token_type(); // one of +, -
             let rhs = self.factor()?;
-            expr = Expr::Binary(Box::new(expr), *operator.token_type(), Box::new(rhs));
+            expr = Expr::Binary(Box::new(expr), operator, Box::new(rhs));
         }
 
         Ok(expr)
@@ -126,9 +126,9 @@ impl Parser {
         let mut expr = self.unary()?;
 
         while self.is_any_tokens(&[TokenType::Star, TokenType::Slash]) {
-            let operator = self.previous().clone();
+            let operator = *self.previous().token_type();
             let rhs = self.unary()?;
-            expr = Expr::Binary(Box::new(expr), *operator.token_type(), Box::new(rhs));
+            expr = Expr::Binary(Box::new(expr), operator, Box::new(rhs));
         }
 
         Ok(expr)
@@ -136,9 +136,9 @@ impl Parser {
 
     fn unary(&mut self) -> Result<Expr> {
         if self.is_any_tokens(&[TokenType::Minus, TokenType::Bang]) {
-            let operator = self.previous().clone();
+            let operator = *self.previous().token_type();
             let rhs = self.unary()?;
-            return Ok(Expr::Unary(*operator.token_type(), Box::new(rhs)));
+            return Ok(Expr::Unary(operator, Box::new(rhs)));
         }
 
         self.primary()
