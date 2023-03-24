@@ -55,7 +55,7 @@ impl Default for Scanner {
         keywords.insert("eof".into(), TokenType::Eof);
 
         Self {
-            source: Vec::new(),
+            source: vec![],
             tokens: vec![],
             line: 1,
             start: 0,
@@ -80,8 +80,9 @@ impl fmt::Debug for Scanner {
 
 impl Scanner {
     pub fn new(source: &str) -> Scanner {
+        let source: Vec<char> = source.chars().collect();
         Scanner {
-            source: source.chars().collect(),
+            source,
             ..Default::default()
         }
     }

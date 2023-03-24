@@ -48,7 +48,7 @@ fn run(input: &str) -> Result<(), Box<dyn Error>> {
     let mut scanner = Scanner::new(input);
     scanner.scan_tokens()?;
 
-    // println!("{scanner:?}");
+    println!("{scanner:?}");
 
     let mut p = scanner.into_parser();
 
