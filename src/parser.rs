@@ -13,8 +13,8 @@
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
 
-mod ast {
-    use crate::tokens::Token;
+pub(crate) mod ast {
+    use crate::tokens::TokenType;
 
     #[derive(Debug)]
     pub enum ExprLiteral {
@@ -28,14 +28,14 @@ mod ast {
     #[derive(Debug)]
     pub enum Expr {
         Grouping(Box<Expr>),
-        Binary(Box<Expr>, Token, Box<Expr>),
-        Unary(Token, Box<Expr>),
+        Binary(Box<Expr>, TokenType, Box<Expr>),
+        Unary(TokenType, Box<Expr>),
         Literal(ExprLiteral),
     }
 }
 
 use self::ast::{Expr, ExprLiteral};
-use crate::errors::RloxError;
+use crate::errors::{ParseError, RloxError};
 use crate::tokens::{Token, TokenLiteral, TokenType};
 
 type Result<T> = std::result::Result<T, RloxError>;
@@ -65,8 +65,15 @@ impl Parser {
         let expr = self.equality();
         if let Err(_err) = expr.as_ref() {
             // TODO: This isn't always a fatal error.
+            // TODO: It's weird that error messages get printed from here, right?
             // Look into this again.
-            eprintln!("Error::{_err:?}");
+            match _err {
+                RloxError::Parse(ParseError::EOF) => (),
+                RloxError::Parse(err) => {
+                    eprintln!("Error::{err:?}");
+                }
+                _ => (),
+            }
             self.synchronize();
         }
         expr
@@ -80,7 +87,7 @@ impl Parser {
         while self.is_any_tokens(&[TokenType::EqualEqual, TokenType::BangEqual]) {
             let operator = self.previous().clone(); // one of ==, !=
             let rhs = self.comparison()?;
-            expr = Expr::Binary(Box::new(expr), operator, Box::new(rhs));
+            expr = Expr::Binary(Box::new(expr), *operator.token_type(), Box::new(rhs));
         }
 
         Ok(expr)
@@ -97,7 +104,7 @@ impl Parser {
         ]) {
             let operator = self.previous().clone(); // one of >, >=, <, <+
             let rhs = self.term()?;
-            expr = Expr::Binary(Box::new(expr), operator, Box::new(rhs));
+            expr = Expr::Binary(Box::new(expr), *operator.token_type(), Box::new(rhs));
         }
 
         Ok(expr)
@@ -109,7 +116,7 @@ impl Parser {
         while self.is_any_tokens(&[TokenType::Plus, TokenType::Minus]) {
             let operator = self.previous().clone(); // one of +, -
             let rhs = self.factor()?;
-            expr = Expr::Binary(Box::new(expr), operator, Box::new(rhs));
+            expr = Expr::Binary(Box::new(expr), *operator.token_type(), Box::new(rhs));
         }
 
         Ok(expr)
@@ -121,7 +128,7 @@ impl Parser {
         while self.is_any_tokens(&[TokenType::Star, TokenType::Slash]) {
             let operator = self.previous().clone();
             let rhs = self.unary()?;
-            expr = Expr::Binary(Box::new(expr), operator, Box::new(rhs));
+            expr = Expr::Binary(Box::new(expr), *operator.token_type(), Box::new(rhs));
         }
 
         Ok(expr)
@@ -131,7 +138,7 @@ impl Parser {
         if self.is_any_tokens(&[TokenType::Minus, TokenType::Bang]) {
             let operator = self.previous().clone();
             let rhs = self.unary()?;
-            return Ok(Expr::Unary(operator, Box::new(rhs)));
+            return Ok(Expr::Unary(*operator.token_type(), Box::new(rhs)));
         }
 
         self.primary()
@@ -170,12 +177,16 @@ impl Parser {
             return Ok(Expr::Grouping(Box::new(expr)));
         }
 
+        if self.is_any_tokens(&[TokenType::Eof]) {
+            return Err(RloxError::Parse(ParseError::EOF));
+        }
+
         // Some kind of unexpected error.
         // TODO: Try to be smarter here.
-        Err(RloxError::Parse(format!(
+        Err(RloxError::Parse(ParseError::UnexpectedToken(format!(
             "Unexpected token \"{}\" in this scope.",
             self.peek()
-        )))
+        ))))
     }
 
     // Helper functions
@@ -202,7 +213,7 @@ impl Parser {
             return Ok(self.advance());
         }
 
-        Err(RloxError::Parse(msg))
+        Err(RloxError::Parse(ParseError::UnexpectedToken(msg)))
     }
 
     fn is_at_end(&self) -> bool {

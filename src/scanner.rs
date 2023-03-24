@@ -63,14 +63,14 @@ impl Default for Scanner {
 
 impl std::fmt::Debug for Scanner {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut debugOut: String = String::new();
-        debugOut.write_str("Scanner: \n").unwrap();
+        let mut debug_out: String = String::new();
+        debug_out.write_str("Scanner: \n").unwrap();
 
         for sc in &self.tokens {
-            debugOut.write_fmt(format_args!("\t{sc}\n")).unwrap();
+            debug_out.write_fmt(format_args!("\t{sc}\n")).unwrap();
         }
 
-        write!(f, "{debugOut}")
+        write!(f, "{debug_out}")
     }
 }
 
@@ -375,5 +375,11 @@ mod tests {
                 panic!("Unexpected \"AND\" token in program.");
             }
         }
+    }
+
+    #[test]
+    fn test_scanner() {
+        let scanner = setup_scanner1();
+        let _parser = scanner.into_parser();
     }
 }

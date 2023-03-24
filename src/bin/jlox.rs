@@ -19,7 +19,7 @@ use std::fs::File;
 use std::io::{self, Write};
 
 use rlox::errors::RloxError;
-use rlox::parser::Parser;
+use rlox::interpreter::ExprResult;
 use rlox::scanner::Scanner;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -45,15 +45,16 @@ fn main() -> Result<(), Box<dyn Error>> {
 // Scans, Parses, and evaluates input.
 fn run(input: &str) -> Result<(), Box<dyn Error>> {
     // TODO: Clean this up.
-    let mut scanner = Scanner::new(&input);
+    let mut scanner = Scanner::new(input);
     scanner.scan_tokens()?;
 
-    println!("{scanner:?}");
+    // println!("{scanner:?}");
 
     let mut p = scanner.into_parser();
 
     while let Some(expr) = p.parse() {
-        println!("{expr:?}");
+        // println!("{expr:?}");
+        println!("{}", ExprResult::interpret(expr)?);
     }
 
     Ok(())

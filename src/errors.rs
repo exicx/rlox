@@ -17,6 +17,12 @@ use std::error;
 use std::fmt;
 
 #[derive(Debug)]
+pub enum ParseError {
+    UnexpectedToken(String),
+    EOF,
+}
+
+#[derive(Debug)]
 pub enum RloxError {
     Cmdline(String),
     Scan {
@@ -24,7 +30,7 @@ pub enum RloxError {
         help: String,
         message: String,
     },
-    Parse(String),
+    Parse(ParseError),
     Interpret(String),
 }
 
