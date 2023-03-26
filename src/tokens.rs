@@ -39,9 +39,9 @@ pub enum TokenType {
     Less,
     LessEqual,
     // Literals.
-    Identifier,
-    String,
-    Number,
+    Identifier, // var X;
+    String,     // "string"
+    Number,     // 0.123
     // Keywords.
     And,
     Class,
@@ -69,33 +69,43 @@ pub enum TokenLiteral {
     None,
 }
 
+impl Display for TokenLiteral {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TokenLiteral::Str(lit_str) => write!(f, "{lit_str}"),
+            TokenLiteral::None => write!(f, "None"),
+            TokenLiteral::Number(num) => write!(f, "{num}"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Token {
     token_type: TokenType,
-    lexeme: String,
-    literal: TokenLiteral,
-    line: usize,
+    literal: TokenLiteral, // parsed value of lexeme
+    line: usize,           // line number where token was found
+    position: usize,       // character position within file
 }
 
 impl Token {
-    pub fn new(token_type: TokenType, lexeme: &[char], line: usize) -> Token {
-        let mut tl: TokenLiteral = TokenLiteral::None;
-        match token_type {
+    pub fn new(token_type: TokenType, lexeme: &[char], line: usize, position: usize) -> Token {
+        let tl = match token_type {
             TokenType::String => {
                 let mut string_literal: String = lexeme.iter().collect();
                 string_literal = string_literal.trim_matches('"').into();
-                tl = TokenLiteral::Str(string_literal);
+                TokenLiteral::Str(string_literal)
             }
             TokenType::Number => {
-                tl = TokenLiteral::Number(lexeme.iter().collect::<String>().parse::<f64>().unwrap())
+                // TODO fix the unwrap() here. Add new error type for token generation failures
+                TokenLiteral::Number(lexeme.iter().collect::<String>().parse::<f64>().unwrap())
             }
-            _ => {}
-        }
+            _ => TokenLiteral::None,
+        };
         Token {
             token_type,
-            lexeme: lexeme.iter().collect(),
             literal: tl,
             line,
+            position,
         }
     }
 
@@ -110,6 +120,6 @@ impl Token {
 
 impl Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?} {:?}", self.token_type, self.lexeme)
+        write!(f, "{:?} {:?}", self.token_type, self.literal)
     }
 }
