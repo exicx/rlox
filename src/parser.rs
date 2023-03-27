@@ -56,14 +56,14 @@ impl Parser {
     // Evaluate the expression and return Stmt::Print(result)
     fn print_statement(&mut self) -> Result<Stmt> {
         let value = self.expression()?;
-        self.consume(TokenType::Semicolon, "Expect ';' after value.".to_string())?;
+        self.consume(TokenType::Semicolon, "Expect ';' after value.")?;
         Ok(Stmt::Print(value))
     }
 
     // Evaluate the expression and return Stmt::ExprStatement(result)
     fn expression_statement(&mut self) -> Result<Stmt> {
         let expr = self.expression()?;
-        self.consume(TokenType::Semicolon, "Expect ';' after value".to_string())?;
+        self.consume(TokenType::Semicolon, "Expect ';' after value")?;
         Ok(Stmt::ExprStatement(expr))
     }
 
@@ -167,10 +167,7 @@ impl Parser {
 
         if self.is_any_tokens(&[TokenType::LeftParen]) {
             let expr = self.expression()?;
-            self.consume(
-                TokenType::RightParen,
-                "Expected ')' after expression.".into(),
-            )?;
+            self.consume(TokenType::RightParen, "Expected ')' after expression.")?;
 
             return Ok(Expr::Grouping(Box::new(expr)));
         }
@@ -204,12 +201,14 @@ impl Parser {
         self.previous()
     }
 
-    fn consume(&mut self, token_type: TokenType, msg: String) -> Result<&Token> {
+    fn consume(&mut self, token_type: TokenType, msg: &str) -> Result<&Token> {
         if self.check(token_type) {
             return Ok(self.advance());
         }
 
-        Err(RloxError::Parse(ParseError::UnexpectedToken(msg)))
+        Err(RloxError::Parse(ParseError::UnexpectedToken(
+            msg.to_string(),
+        )))
     }
 
     fn is_at_end(&self) -> bool {
