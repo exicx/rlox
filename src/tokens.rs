@@ -66,6 +66,7 @@ pub enum TokenType {
 pub enum TokenLiteral {
     Str(String),
     Number(f64),
+    Identifier(String),
     None,
 }
 
@@ -75,6 +76,7 @@ impl Display for TokenLiteral {
             TokenLiteral::Str(lit_str) => write!(f, "{lit_str}"),
             TokenLiteral::None => write!(f, "None"),
             TokenLiteral::Number(num) => write!(f, "{num}"),
+            TokenLiteral::Identifier(iden) => write!(f, "{iden}"),
         }
     }
 }
@@ -98,7 +100,12 @@ impl Token {
             }
             TokenType::Number => {
                 // TODO fix the unwrap() here. Add new error type for token generation failures
-                TokenLiteral::Number(lexeme.parse::<f64>().unwrap())
+                let number = lexeme.parse::<f64>().unwrap();
+                TokenLiteral::Number(number)
+            }
+            TokenType::Identifier => {
+                let identifier = lexeme.clone();
+                TokenLiteral::Identifier(identifier)
             }
             _ => TokenLiteral::None,
         };
