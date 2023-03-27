@@ -13,30 +13,11 @@
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
 
-pub(crate) mod ast {
-    use crate::tokens::TokenType;
+pub mod ast;
 
-    #[derive(Debug)]
-    pub enum ExprLiteral {
-        True,
-        False,
-        Number(f64),
-        String(String),
-        Nil,
-    }
-
-    #[derive(Debug)]
-    pub enum Expr {
-        Grouping(Box<Expr>),
-        Binary(Box<Expr>, TokenType, Box<Expr>),
-        Unary(TokenType, Box<Expr>),
-        Literal(ExprLiteral),
-    }
-}
-
-use self::ast::{Expr, ExprLiteral};
 use crate::errors::{ParseError, RloxError};
 use crate::tokens::{Token, TokenLiteral, TokenType};
+use ast::{Expr, ExprLiteral, Stmt};
 
 type Result<T> = std::result::Result<T, RloxError>;
 
@@ -52,24 +33,41 @@ impl Parser {
 
     // Build up the AST by precendence
     // Parser methods
-    pub fn parse(&mut self) -> Option<Expr> {
-        match self.expression() {
-            Ok(expr) => Some(expr),
-            Err(err) => {
-                // TODO: This isn't always a fatal error.
-                // TODO: It's weird that error messages get printed from here, right?
-                // Look into this again.
-                match err {
-                    RloxError::Parse(ParseError::EOF) => (),
-                    RloxError::Parse(err) => {
-                        eprintln!("Error::{err:?}");
-                    }
-                    _ => (),
-                }
-                None
-            }
+    pub fn parse(&mut self) -> Result<Vec<Stmt>> {
+        let mut statements = Vec::new();
+        while !self.is_at_end() {
+            statements.push(self.statement());
+        }
+        statements.into_iter().collect::<Result<Vec<_>>>()
+    }
+
+    // Statement functions
+
+    fn statement(&mut self) -> Result<Stmt> {
+        if self.is_any_tokens(&[TokenType::Print]) {
+            // We're a `print` statement
+            self.print_statement()
+        } else {
+            // We're an expression
+            self.expression_statement()
         }
     }
+
+    // Evaluate the expression and return Stmt::Print(result)
+    fn print_statement(&mut self) -> Result<Stmt> {
+        let value = self.expression()?;
+        self.consume(TokenType::Semicolon, "Expect ';' after value.".to_string())?;
+        Ok(Stmt::Print(value))
+    }
+
+    // Evaluate the expression and return Stmt::ExprStatement(result)
+    fn expression_statement(&mut self) -> Result<Stmt> {
+        let expr = self.expression()?;
+        self.consume(TokenType::Semicolon, "Expect ';' after value".to_string())?;
+        Ok(Stmt::ExprStatement(expr))
+    }
+
+    // Expression functions
 
     fn expression(&mut self) -> Result<Expr> {
         let expr = self.equality();
@@ -85,7 +83,7 @@ impl Parser {
         // Loop over equality expression, building up the AST with recursive Binary Expressions
         // a == b == c == d == e != f ...
         while self.is_any_tokens(&[TokenType::EqualEqual, TokenType::BangEqual]) {
-            let operator = *self.previous().token_type(); // one of ==, !=
+            let operator = self.previous().token_type(); // one of ==, !=
             let rhs = self.comparison()?;
             expr = Expr::Binary(Box::new(expr), operator, Box::new(rhs));
         }
@@ -102,7 +100,7 @@ impl Parser {
             TokenType::Less,
             TokenType::LessEqual,
         ]) {
-            let operator = *self.previous().token_type(); // one of >, >=, <, <+
+            let operator = self.previous().token_type(); // one of >, >=, <, <+
             let rhs = self.term()?;
             expr = Expr::Binary(Box::new(expr), operator, Box::new(rhs));
         }
@@ -114,7 +112,7 @@ impl Parser {
         let mut expr = self.factor()?;
 
         while self.is_any_tokens(&[TokenType::Plus, TokenType::Minus]) {
-            let operator = *self.previous().token_type(); // one of +, -
+            let operator = self.previous().token_type(); // one of +, -
             let rhs = self.factor()?;
             expr = Expr::Binary(Box::new(expr), operator, Box::new(rhs));
         }
@@ -126,7 +124,7 @@ impl Parser {
         let mut expr = self.unary()?;
 
         while self.is_any_tokens(&[TokenType::Star, TokenType::Slash]) {
-            let operator = *self.previous().token_type();
+            let operator = self.previous().token_type();
             let rhs = self.unary()?;
             expr = Expr::Binary(Box::new(expr), operator, Box::new(rhs));
         }
@@ -136,7 +134,7 @@ impl Parser {
 
     fn unary(&mut self) -> Result<Expr> {
         if self.is_any_tokens(&[TokenType::Minus, TokenType::Bang]) {
-            let operator = *self.previous().token_type();
+            let operator = self.previous().token_type();
             let rhs = self.unary()?;
             return Ok(Expr::Unary(operator, Box::new(rhs)));
         }
@@ -146,10 +144,10 @@ impl Parser {
 
     fn primary(&mut self) -> Result<Expr> {
         if self.is_any_tokens(&[TokenType::False]) {
-            return Ok(Expr::Literal(ExprLiteral::False));
+            return Ok(Expr::Literal(ExprLiteral::Bool(false)));
         }
         if self.is_any_tokens(&[TokenType::True]) {
-            return Ok(Expr::Literal(ExprLiteral::True));
+            return Ok(Expr::Literal(ExprLiteral::Bool(true)));
         }
         if self.is_any_tokens(&[TokenType::Nil]) {
             return Ok(Expr::Literal(ExprLiteral::Nil));
@@ -170,7 +168,7 @@ impl Parser {
         if self.is_any_tokens(&[TokenType::LeftParen]) {
             let expr = self.expression()?;
             self.consume(
-                &TokenType::RightParen,
+                TokenType::RightParen,
                 "Expected ')' after expression.".into(),
             )?;
 
@@ -181,19 +179,17 @@ impl Parser {
             return Err(RloxError::Parse(ParseError::EOF));
         }
 
-        // Some kind of unexpected error.
         // TODO: Try to be smarter here.
-        Err(RloxError::Parse(ParseError::UnexpectedToken(format!(
-            "Unexpected token \"{}\" in this scope.",
-            self.peek()
-        ))))
+        Err(RloxError::Parse(ParseError::UnexpectedToken(
+            self.peek().to_string(),
+        )))
     }
 
     // Helper functions
 
     fn is_any_tokens(&mut self, tokens: &[TokenType]) -> bool {
         for token in tokens {
-            if self.check(token) {
+            if self.check(*token) {
                 self.advance();
                 return true;
             }
@@ -208,7 +204,7 @@ impl Parser {
         self.previous()
     }
 
-    fn consume(&mut self, token_type: &TokenType, msg: String) -> Result<&Token> {
+    fn consume(&mut self, token_type: TokenType, msg: String) -> Result<&Token> {
         if self.check(token_type) {
             return Ok(self.advance());
         }
@@ -217,10 +213,10 @@ impl Parser {
     }
 
     fn is_at_end(&self) -> bool {
-        self.check(&TokenType::Eof)
+        self.check(TokenType::Eof)
     }
 
-    fn check(&self, token_type: &TokenType) -> bool {
+    fn check(&self, token_type: TokenType) -> bool {
         self.peek().token_type() == token_type
     }
 
@@ -238,7 +234,7 @@ impl Parser {
             // Continue scanning forward until we reach a SemiColon
             // or a keyword. This lets us get past a syntax error and
             // continue parsing.
-            if self.previous().token_type() == &TokenType::Semicolon {
+            if self.previous().token_type() == TokenType::Semicolon {
                 return;
             }
             match self.peek().token_type() {
@@ -279,14 +275,14 @@ mod tests {
     fn basic_seeking() {
         let mut p = get_parser_scanner(None);
 
-        assert!(p.check(&TokenType::Number));
+        assert!(p.check(TokenType::Number));
 
-        assert_eq!(p.advance().token_type(), &TokenType::Number);
-        assert_eq!(p.advance().token_type(), &TokenType::EqualEqual);
-        assert_eq!(p.advance().token_type(), &TokenType::Number);
-        assert_eq!(p.advance().token_type(), &TokenType::Semicolon);
+        assert_eq!(p.advance().token_type(), TokenType::Number);
+        assert_eq!(p.advance().token_type(), TokenType::EqualEqual);
+        assert_eq!(p.advance().token_type(), TokenType::Number);
+        assert_eq!(p.advance().token_type(), TokenType::Semicolon);
 
-        assert_eq!(p.peek().token_type(), &TokenType::Eof);
+        assert_eq!(p.peek().token_type(), TokenType::Eof);
     }
 
     #[test]
@@ -298,9 +294,9 @@ mod tests {
 
         // we shouldn't seek past the EOF token.
         p.advance();
-        assert_eq!(p.peek().token_type(), &TokenType::Eof);
+        assert_eq!(p.peek().token_type(), TokenType::Eof);
         p.advance();
-        assert_eq!(p.peek().token_type(), &TokenType::Eof);
+        assert_eq!(p.peek().token_type(), TokenType::Eof);
     }
 
     #[test]
@@ -312,7 +308,7 @@ mod tests {
     #[test]
     fn basic_matching_equal() {
         let mut p = get_parser_scanner(None);
-        assert!(p.check(&TokenType::Number));
+        assert!(p.check(TokenType::Number));
         p.advance();
         assert!(p.is_any_tokens(&[TokenType::EqualEqual, TokenType::BangEqual]));
     }

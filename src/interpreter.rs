@@ -15,22 +15,17 @@
 
 use std::fmt;
 
-use crate::errors::RloxError;
-use crate::parser::ast::{Expr, ExprLiteral};
+use crate::errors::{RloxError, RuntimeError};
+use crate::parser::ast::{Expr, ExprLiteral, Stmt};
 use crate::tokens::TokenType;
 
+// TODO why am I doing this?
 #[derive(Debug, PartialEq)]
 pub enum ExprResult {
-    Nil,
     Bool(bool),
     Number(f64),
-    LoxString(String),
-}
-
-impl ExprResult {
-    pub fn interpret(expr: Expr) -> Result<ExprResult, RloxError> {
-        evaluate(expr)
-    }
+    String(String),
+    Nil,
 }
 
 impl fmt::Display for ExprResult {
@@ -45,20 +40,48 @@ impl fmt::Display for ExprResult {
             }
             ExprResult::Nil => write!(f, "nil"),
             ExprResult::Number(n) => write!(f, "{}", n),
-            ExprResult::LoxString(s) => write!(f, "{s}"),
+            ExprResult::String(s) => write!(f, "{s}"),
         }
+    }
+}
+
+#[derive(Default)]
+pub struct Interpreter {
+    // TODO some kind of stack or state tracking
+}
+
+impl Interpreter {
+    pub fn new() -> Interpreter {
+        Default::default()
+    }
+    pub fn interpret(&self, program: Vec<Stmt>) -> Result<(), RloxError> {
+        for statement in program {
+            match statement {
+                Stmt::ExprStatement(expr) => {
+                    evaluate(expr)?;
+                }
+                Stmt::Print(expr) => {
+                    let result = evaluate(expr)?;
+                    println!("{result}");
+                }
+            }
+        }
+
+        Ok(())
     }
 }
 
 fn evaluate(expr: Expr) -> Result<ExprResult, RloxError> {
     match expr {
         // Evaluate literals
+        // ? TODO
+        // Why am I converting from an ExprLiteral to an ExprResult
         Expr::Literal(lit) => match lit {
-            ExprLiteral::False => Ok(ExprResult::Bool(false)),
-            ExprLiteral::True => Ok(ExprResult::Bool(true)),
+            ExprLiteral::Bool(false) => Ok(ExprResult::Bool(false)),
+            ExprLiteral::Bool(true) => Ok(ExprResult::Bool(true)),
             ExprLiteral::Nil => Ok(ExprResult::Nil),
             ExprLiteral::Number(n) => Ok(ExprResult::Number(n)),
-            ExprLiteral::String(ls) => Ok(ExprResult::LoxString(ls)),
+            ExprLiteral::String(ls) => Ok(ExprResult::String(ls)),
         },
         // Recursively evaluate grouping's subexpressions.
         Expr::Grouping(group) => evaluate(*group),
@@ -80,10 +103,10 @@ fn unary(token: TokenType, unary: Expr) -> Result<ExprResult, RloxError> {
 
     let right: ExprResult = evaluate(unary)?;
     match right {
-        ExprResult::LoxString(_) | ExprResult::Nil => {
-            return Err(RloxError::Interpret(format!(
+        ExprResult::String(_) | ExprResult::Nil => {
+            return Err(RloxError::Interpret(RuntimeError::TypeComparison(format!(
                 "Cannot apply unary operator \"{token:?}\" to expression."
-            )));
+            ))));
         }
         _ => (),
     }
@@ -106,7 +129,7 @@ fn unary(token: TokenType, unary: Expr) -> Result<ExprResult, RloxError> {
 }
 
 fn binary(expr1: Expr, token: TokenType, expr2: Expr) -> Result<ExprResult, RloxError> {
-    use self::ExprResult::{Bool, LoxString, Number};
+    use self::ExprResult::{Bool, Number, String};
 
     let left = evaluate(expr1)?;
     let right = evaluate(expr2)?;
@@ -116,21 +139,27 @@ fn binary(expr1: Expr, token: TokenType, expr2: Expr) -> Result<ExprResult, Rlox
             if let (Number(left), Number(right)) = (left, right) {
                 Ok(Number(left - right))
             } else {
-                Err(RloxError::Interpret("Cannot subtract types".into()))
+                Err(RloxError::Interpret(RuntimeError::Math(
+                    "Cannot subtract types".into(),
+                )))
             }
         }
         TokenType::Slash => {
             if let (Number(left), Number(right)) = (left, right) {
                 Ok(Number(left / right))
             } else {
-                Err(RloxError::Interpret("Cannot divide types".into()))
+                Err(RloxError::Interpret(RuntimeError::Math(
+                    "Cannot divide types".into(),
+                )))
             }
         }
         TokenType::Star => {
             if let (Number(left), Number(right)) = (left, right) {
                 Ok(Number(left * right))
             } else {
-                Err(RloxError::Interpret("Cannot multiply types".into()))
+                Err(RloxError::Interpret(RuntimeError::Math(
+                    "Cannot multiply types".into(),
+                )))
             }
         }
         TokenType::Plus => {
@@ -139,10 +168,12 @@ fn binary(expr1: Expr, token: TokenType, expr2: Expr) -> Result<ExprResult, Rlox
                 Ok(Number(left + right))
             }
             // Handle string concatenation
-            else if let (LoxString(left), LoxString(right)) = (left, right) {
-                Ok(LoxString(left + &right))
+            else if let (String(left), String(right)) = (left, right) {
+                Ok(String(left + &right))
             } else {
-                Err(RloxError::Interpret("Cannot concatenate types".into()))
+                Err(RloxError::Interpret(RuntimeError::Concatenation(
+                    "Cannot concatenate types".into(),
+                )))
             }
         }
 
@@ -150,28 +181,36 @@ fn binary(expr1: Expr, token: TokenType, expr2: Expr) -> Result<ExprResult, Rlox
             if let (Number(left), Number(right)) = (left, right) {
                 Ok(Bool(left > right))
             } else {
-                Err(RloxError::Interpret("Cannot compare types".into()))
+                Err(RloxError::Interpret(RuntimeError::TypeComparison(
+                    "Cannot compare types".into(),
+                )))
             }
         }
         TokenType::GreaterEqual => {
             if let (Number(left), Number(right)) = (left, right) {
                 Ok(Bool(left >= right))
             } else {
-                Err(RloxError::Interpret("Cannot compare types".into()))
+                Err(RloxError::Interpret(RuntimeError::TypeComparison(
+                    "Cannot compare types".into(),
+                )))
             }
         }
         TokenType::Less => {
             if let (Number(left), Number(right)) = (left, right) {
                 Ok(Bool(left < right))
             } else {
-                Err(RloxError::Interpret("Cannot compare types".into()))
+                Err(RloxError::Interpret(RuntimeError::TypeComparison(
+                    "Cannot compare types".into(),
+                )))
             }
         }
         TokenType::LessEqual => {
             if let (Number(left), Number(right)) = (left, right) {
                 Ok(Bool(left <= right))
             } else {
-                Err(RloxError::Interpret("Cannot compare types".into()))
+                Err(RloxError::Interpret(RuntimeError::TypeComparison(
+                    "Cannot compare types".into(),
+                )))
             }
         }
 
@@ -196,4 +235,10 @@ fn is_equal(left: &ExprResult, right: &ExprResult) -> bool {
     *left == *right
 }
 
-// errors
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_interpreter() {}
+}

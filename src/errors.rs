@@ -17,30 +17,65 @@ use std::error;
 use std::fmt;
 
 #[derive(Debug)]
+pub struct ScanError {
+    line: usize,
+    position: usize,
+    help: String,
+    message: String,
+}
+
+impl ScanError {
+    pub fn new(line: usize, position: usize, help: &str, message: &str) -> Self {
+        Self {
+            line,
+            position,
+            help: help.to_string(),
+            message: message.to_string(),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub enum ParseError {
     UnexpectedToken(String),
     EOF,
 }
 
+#[derive(Debug)]
 pub enum RuntimeError {
-    // TODO: runtime errors here.
+    TypeComparison(String),
+    Concatenation(String),
+    Math(String),
 }
 
 #[derive(Debug)]
 pub enum RloxError {
     Cmdline(String),
-    Scan {
-        line: usize,
-        help: String,
-        message: String,
-    },
+    Scan(ScanError),
     Parse(ParseError),
-    Interpret(String), // TODO: More specific errors here.
+    Interpret(RuntimeError),
 }
 
 impl fmt::Display for RloxError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "")
+        match self {
+            Self::Cmdline(str) => {
+                write!(f, "{str}")
+            }
+            Self::Scan(err) => {
+                write!(
+                    f,
+                    "[line {}:{}] {}:{}",
+                    err.line, err.position, err.message, err.help
+                )
+            }
+            Self::Parse(err) => {
+                write!(f, "{err:?}")
+            }
+            Self::Interpret(err) => {
+                write!(f, "{err:?}")
+            }
+        }
     }
 }
 impl error::Error for RloxError {}

@@ -19,7 +19,7 @@ use std::fs::File;
 use std::io::{self, Write};
 
 use rlox::errors::RloxError;
-use rlox::interpreter::ExprResult;
+use rlox::interpreter::Interpreter;
 use rlox::scanner::Scanner;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -29,9 +29,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         // Too many arguments
         len if len > 2 => {
             eprintln!("Usage: jlox [script]");
-            return Err(Box::new(RloxError::Cmdline(String::from(
-                "Too many arguments.",
-            ))));
+            return Err(Box::new(RloxError::Cmdline(
+                "Too many arguments.".to_string(),
+            )));
         }
         // Filename given
         len if len == 2 => run_file(&cmdline[1])?,
@@ -43,20 +43,16 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 // Scans, Parses, and evaluates input.
-fn run(input: &str) -> Result<(), Box<dyn Error>> {
+fn run(input: &str) -> Result<(), RloxError> {
     // TODO: Clean this up.
     let mut scanner = Scanner::new(input);
     scanner.scan_tokens()?;
 
-    println!("{scanner:?}");
+    // Parse the input and evaluate expressions
+    let program = scanner.into_parser().parse()?;
 
-    let mut p = scanner.into_parser();
-
-    while let Some(expr) = p.parse() {
-        // println!("{expr:?}");
-        println!("{}", ExprResult::interpret(expr)?);
-    }
-
+    let interpreter = Interpreter::new();
+    interpreter.interpret(program)?;
     Ok(())
 }
 
@@ -90,15 +86,13 @@ fn run_prompt() -> Result<(), Box<dyn Error>> {
             Ok(1) => println!("\nUse ^D to close REPL."),
             Ok(_) => (),
             // Ignore any errors for now.
-            Err(e) => eprint!("{e:?}"),
+            Err(e) => print!("error: {e:?}"),
         }
 
         // Run user's input
         // Don't kill the user's session if they make a mistake.
-        // Print the error.
-        let res = run(&buf);
-        if let Err(e) = res {
-            println!("{e}");
+        if let Err(err) = run(&buf) {
+            println!("{err}");
         }
     }
 

@@ -82,6 +82,7 @@ impl Display for TokenLiteral {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Token {
     token_type: TokenType,
+    lexeme: String,
     literal: TokenLiteral, // parsed value of lexeme
     line: usize,           // line number where token was found
     position: usize,       // character position within file
@@ -89,28 +90,29 @@ pub struct Token {
 
 impl Token {
     pub fn new(token_type: TokenType, lexeme: &[char], line: usize, position: usize) -> Token {
+        let lexeme: String = lexeme.iter().collect();
         let tl = match token_type {
             TokenType::String => {
-                let mut string_literal: String = lexeme.iter().collect();
-                string_literal = string_literal.trim_matches('"').into();
+                let string_literal = lexeme.trim_matches('"').into();
                 TokenLiteral::Str(string_literal)
             }
             TokenType::Number => {
                 // TODO fix the unwrap() here. Add new error type for token generation failures
-                TokenLiteral::Number(lexeme.iter().collect::<String>().parse::<f64>().unwrap())
+                TokenLiteral::Number(lexeme.parse::<f64>().unwrap())
             }
             _ => TokenLiteral::None,
         };
         Token {
             token_type,
+            lexeme,
             literal: tl,
             line,
             position,
         }
     }
 
-    pub fn token_type(&self) -> &TokenType {
-        &self.token_type
+    pub fn token_type(&self) -> TokenType {
+        self.token_type
     }
 
     pub fn token_literal(&self) -> &TokenLiteral {
@@ -120,6 +122,10 @@ impl Token {
 
 impl Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?} {:?}", self.token_type, self.literal)
+        write!(
+            f,
+            "{:?} {} on line {} at position {}",
+            self.token_type, self.lexeme, self.line, self.position
+        )
     }
 }
