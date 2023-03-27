@@ -20,6 +20,7 @@ pub enum ExprLiteral {
     Bool(bool),
     Number(f64),
     String(String),
+    Identifier(String),
     Nil,
 }
 
@@ -29,12 +30,12 @@ pub enum Expr {
     Binary(Box<Expr>, TokenType, Box<Expr>),
     Unary(TokenType, Box<Expr>),
     Literal(ExprLiteral),
-    Variable,
+    Variable(ExprLiteral),
 }
 
 #[derive(Debug)]
 pub enum Stmt {
     Print(Expr),
     ExprStatement(Expr),
-    Var,
+    Var(String, Option<Expr>),
 }
