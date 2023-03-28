@@ -18,7 +18,7 @@ use std::error::Error;
 use std::fs::File;
 use std::io::{self, Write};
 
-use rlox::errors::RloxError;
+use rlox::errors::{ParseError, RloxError};
 use rlox::interpreter::Interpreter;
 use rlox::scanner::Scanner;
 
@@ -49,7 +49,18 @@ fn run(input: &str) -> Result<(), RloxError> {
     scanner.scan_tokens()?;
 
     // Parse the input and evaluate expressions
-    let program = scanner.into_parser().parse()?;
+    let program = scanner.into_parser().parse();
+
+    // Does this work?
+    // We want to print all parsing errors
+    let has_error = program.iter().any(|i| i.is_err());
+    let errors = program.iter().filter(|err| err.is_err()).map(|err| {
+        println!("{err}");
+    });
+    if has_error {
+        println!("Exiting.");
+        return Err(ParseError::ParseFailure);
+    }
 
     let interpreter = Interpreter::new();
     interpreter.interpret(program)?;

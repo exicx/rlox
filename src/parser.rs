@@ -33,12 +33,45 @@ impl Parser {
 
     // Build up the AST by precendence
     // Parser methods
-    pub fn parse(&mut self) -> Result<Vec<Stmt>> {
+    pub fn parse(&mut self) -> Vec<Result<Stmt>> {
         let mut statements = Vec::new();
         while !self.is_at_end() {
-            statements.push(self.statement());
+            // parse the next declaration
+            let stmt = self.declaration();
+            if stmt.is_err() {
+                // if there's an error, synchronize to the next synchronization point
+                self.synchronize();
+            }
+            statements.push(stmt);
         }
-        statements.into_iter().collect::<Result<Vec<_>>>()
+        statements
+    }
+
+    fn declaration(&mut self) -> Result<Stmt> {
+        if self.is_any_tokens(&[TokenType::Var]) {
+            return self.var_declaration();
+        }
+
+        return self.statement();
+    }
+
+    fn var_declaration(&mut self) -> Result<Stmt> {
+        let token = self
+            .consume(TokenType::Identifier, "Expect variable name.")?
+            .token_literal()
+            .to_string();
+
+        let value = match self.is_any_tokens(&[TokenType::Equal]) {
+            true => Some(self.expression()?),
+            false => None,
+        };
+
+        self.consume(
+            TokenType::Semicolon,
+            "Expect ';' after variable declaration",
+        )?;
+
+        Ok(Stmt::Var(token, value))
     }
 
     // Statement functions
@@ -70,11 +103,7 @@ impl Parser {
     // Expression functions
 
     fn expression(&mut self) -> Result<Expr> {
-        let expr = self.equality();
-        if let Err(_err) = expr.as_ref() {
-            self.synchronize();
-        }
-        expr
+        self.equality()
     }
 
     fn equality(&mut self) -> Result<Expr> {
@@ -170,6 +199,15 @@ impl Parser {
             self.consume(TokenType::RightParen, "Expected ')' after expression.")?;
 
             return Ok(Expr::Grouping(Box::new(expr)));
+        }
+
+        if self.is_any_tokens(&[TokenType::Identifier]) {
+            if let TokenLiteral::Identifier(literal) = self.previous().token_literal().clone() {
+                return Ok(Expr::Variable(ExprLiteral::Identifier(literal)));
+            } else {
+                // Should not be reachable unless by programmer error in scanner.
+                panic!("Expected identifier.");
+            }
         }
 
         if self.is_any_tokens(&[TokenType::Eof]) {

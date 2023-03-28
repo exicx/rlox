@@ -37,6 +37,7 @@ impl ScanError {
 
 #[derive(Debug)]
 pub enum ParseError {
+    ParseFailure,
     UnexpectedToken(String),
     EOF,
 }
