@@ -49,10 +49,10 @@ impl Parser {
 
     fn declaration(&mut self) -> Result<Stmt> {
         if self.is_any_tokens(&[TokenType::Var]) {
-            return self.var_declaration();
+            self.var_declaration()
+        } else {
+            self.statement()
         }
-
-        return self.statement();
     }
 
     fn var_declaration(&mut self) -> Result<Stmt> {
@@ -203,7 +203,7 @@ impl Parser {
 
         if self.is_any_tokens(&[TokenType::Identifier]) {
             if let TokenLiteral::Identifier(literal) = self.previous().token_literal().clone() {
-                return Ok(Expr::Variable(ExprLiteral::Identifier(literal)));
+                return Ok(Expr::Variable(literal));
             } else {
                 // Should not be reachable unless by programmer error in scanner.
                 panic!("Expected identifier.");

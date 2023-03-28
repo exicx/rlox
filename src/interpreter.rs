@@ -64,6 +64,11 @@ impl Interpreter {
                     let result = evaluate(expr)?;
                     println!("{result}");
                 }
+                Stmt::Var(identifier, expr) => {
+                    let result = expr.map(evaluate);
+
+                    // save somewhere or do something
+                }
             }
         }
 
@@ -83,6 +88,12 @@ fn evaluate(expr: Expr) -> Result<ExprResult, RloxError> {
             ExprLiteral::Number(n) => Ok(ExprResult::Number(n)),
             ExprLiteral::String(ls) => Ok(ExprResult::String(ls)),
         },
+        Expr::Variable(ident) => {
+            // Accessing a variable.
+            // Need to read it from here.
+            // TODO
+            Err(RloxError::Interpret(RuntimeError::VariableAccess))
+        }
         // Recursively evaluate grouping's subexpressions.
         Expr::Grouping(group) => evaluate(*group),
         Expr::Unary(token, expr) => unary(token, *expr),
@@ -139,7 +150,7 @@ fn binary(expr1: Expr, token: TokenType, expr2: Expr) -> Result<ExprResult, Rlox
             if let (Number(left), Number(right)) = (left, right) {
                 Ok(Number(left - right))
             } else {
-                Err(RloxError::Interpret(RuntimeError::Math(
+                Err(RloxError::Interpret(RuntimeError::Arithmetic(
                     "Cannot subtract types".into(),
                 )))
             }
@@ -148,7 +159,7 @@ fn binary(expr1: Expr, token: TokenType, expr2: Expr) -> Result<ExprResult, Rlox
             if let (Number(left), Number(right)) = (left, right) {
                 Ok(Number(left / right))
             } else {
-                Err(RloxError::Interpret(RuntimeError::Math(
+                Err(RloxError::Interpret(RuntimeError::Arithmetic(
                     "Cannot divide types".into(),
                 )))
             }
@@ -157,7 +168,7 @@ fn binary(expr1: Expr, token: TokenType, expr2: Expr) -> Result<ExprResult, Rlox
             if let (Number(left), Number(right)) = (left, right) {
                 Ok(Number(left * right))
             } else {
-                Err(RloxError::Interpret(RuntimeError::Math(
+                Err(RloxError::Interpret(RuntimeError::Arithmetic(
                     "Cannot multiply types".into(),
                 )))
             }

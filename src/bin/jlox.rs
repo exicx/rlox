@@ -53,18 +53,23 @@ fn run(input: &str) -> Result<(), RloxError> {
 
     // Does this work?
     // We want to print all parsing errors
+    for res in &program {
+        if let Err(err) = res {
+            println!("{}", err);
+        }
+    }
     let has_error = program.iter().any(|i| i.is_err());
-    let errors = program.iter().filter(|err| err.is_err()).map(|err| {
-        println!("{err}");
-    });
     if has_error {
         println!("Exiting.");
-        return Err(ParseError::ParseFailure);
+        return Err(RloxError::Parse(ParseError::ParseFailure));
     }
 
+    // Collect just the successful parses.
+    // This is either everything, or nothing. Because we exited in the last step
+    let program: Result<Vec<_>, RloxError> = program.into_iter().collect();
+
     let interpreter = Interpreter::new();
-    interpreter.interpret(program)?;
-    Ok(())
+    interpreter.interpret(program?)
 }
 
 // Reads a file in and runs it.

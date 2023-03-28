@@ -46,7 +46,8 @@ pub enum ParseError {
 pub enum RuntimeError {
     TypeComparison(String),
     Concatenation(String),
-    Math(String),
+    Arithmetic(String),
+    VariableAccess,
 }
 
 #[derive(Debug)]
