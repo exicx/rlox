@@ -93,11 +93,11 @@ impl Parser {
         Ok(Stmt::Print(value))
     }
 
-    // Evaluate the expression and return Stmt::ExprStatement(result)
+    // Evaluate the expression and return Stmt::Expression(result)
     fn expression_statement(&mut self) -> Result<Stmt> {
         let expr = self.expression()?;
         self.consume(TokenType::Semicolon, "Expect ';' after value")?;
-        Ok(Stmt::ExprStatement(expr))
+        Ok(Stmt::Expression(expr))
     }
 
     // Expression functions
@@ -196,7 +196,7 @@ impl Parser {
 
         if self.is_any_tokens(&[TokenType::LeftParen]) {
             let expr = self.expression()?;
-            self.consume(TokenType::RightParen, "Expected ')' after expression.")?;
+            self.consume(TokenType::RightParen, "Expected ')' after expression")?;
 
             return Ok(Expr::Grouping(Box::new(expr)));
         }
@@ -206,7 +206,7 @@ impl Parser {
                 return Ok(Expr::Variable(literal));
             } else {
                 // Should not be reachable unless by programmer error in scanner.
-                panic!("Expected identifier.");
+                panic!("Expected identifier");
             }
         }
 

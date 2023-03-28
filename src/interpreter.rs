@@ -19,6 +19,8 @@ use crate::errors::{RloxError, RuntimeError};
 use crate::parser::ast::{Expr, ExprLiteral, Stmt};
 use crate::tokens::TokenType;
 
+mod environment;
+
 // TODO why am I doing this?
 #[derive(Debug, PartialEq)]
 pub enum ExprResult {
@@ -57,7 +59,7 @@ impl Interpreter {
     pub fn interpret(&self, program: Vec<Stmt>) -> Result<(), RloxError> {
         for statement in program {
             match statement {
-                Stmt::ExprStatement(expr) => {
+                Stmt::Expression(expr) => {
                     evaluate(expr)?;
                 }
                 Stmt::Print(expr) => {
