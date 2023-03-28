@@ -17,7 +17,3 @@ rust-version = "1.56"
 
 [profile.release]
 lto = true
-incremental = true
-strip = true
-opt-level = "s"
-codegen-units = 1
