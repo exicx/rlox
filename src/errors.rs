@@ -16,7 +16,7 @@
 use std::error;
 use std::fmt;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct ScanError {
     line: usize,
     position: usize,
@@ -35,22 +35,22 @@ impl ScanError {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum ParseError {
     ParseFailure(String),
     UnexpectedToken(String),
     EOF,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum RuntimeError {
     TypeComparison(String),
     Concatenation(String),
     Arithmetic(String),
-    VariableAccess,
+    UndefinedVariable, // Null access error
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum RloxError {
     Cmdline(String),
     Scan(ScanError),

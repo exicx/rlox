@@ -43,7 +43,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 // Scans, Parses, and evaluates input.
-fn run(input: &str) -> Result<(), RloxError> {
+fn run(interpreter: &mut Interpreter, input: &str) -> Result<(), RloxError> {
     // TODO: Clean this up.
     let mut scanner = Scanner::new(input);
     scanner.scan_tokens()?;
@@ -68,8 +68,6 @@ fn run(input: &str) -> Result<(), RloxError> {
     // Collect just the successful parses.
     // This is either everything, or nothing. Because we exited in the last step
     let program: Result<Vec<_>, RloxError> = program.into_iter().collect();
-
-    let interpreter = Interpreter::new();
     interpreter.interpret(program?)
 }
 
@@ -78,7 +76,8 @@ fn run_file(filename: &str) -> Result<(), Box<dyn Error>> {
     let file_handle = File::open(filename)?;
     let buf = io::read_to_string(file_handle)?;
 
-    run(&buf)?;
+    let mut interpreter = Interpreter::new();
+    run(&mut interpreter, &buf)?;
     Ok(())
 }
 
@@ -86,6 +85,7 @@ fn run_file(filename: &str) -> Result<(), Box<dyn Error>> {
 // Runs code line-by-line.
 fn run_prompt() -> Result<(), Box<dyn Error>> {
     let stdin = io::stdin();
+    let mut interpreter = Interpreter::new();
 
     loop {
         let mut buf = String::new();
@@ -108,7 +108,7 @@ fn run_prompt() -> Result<(), Box<dyn Error>> {
 
         // Run user's input
         // Don't kill the user's session if they make a mistake.
-        if let Err(err) = run(&buf) {
+        if let Err(err) = run(&mut interpreter, &buf) {
             println!("{err}");
         }
     }
