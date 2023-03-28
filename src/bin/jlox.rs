@@ -60,8 +60,9 @@ fn run(input: &str) -> Result<(), RloxError> {
     }
     let has_error = program.iter().any(|i| i.is_err());
     if has_error {
-        println!("Exiting.");
-        return Err(RloxError::Parse(ParseError::ParseFailure));
+        return Err(RloxError::Parse(ParseError::ParseFailure(String::from(
+            "Exiting.",
+        ))));
     }
 
     // Collect just the successful parses.

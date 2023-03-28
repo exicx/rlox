@@ -95,7 +95,7 @@ impl Scanner {
             // multi-char tokens
             self.start = self.current;
 
-            if let Some(token_type) = self.scan_token() {
+            if let Some(token_type) = self.scan_token()? {
                 self.add_token(token_type)
             }
         }
@@ -107,68 +107,70 @@ impl Scanner {
         Ok(())
     }
 
-    // TODO: All errors from the scanner get lost here.
-    // How can we return an optional value AND a result here?
-    // *thinking emoji*
-    fn scan_token(&mut self) -> Option<TokenType> {
-        let ch = self.advance()?;
+    fn scan_token(&mut self) -> Result<Option<TokenType>> {
+        let ch = self.advance();
+        if ch.is_none() {
+            // Non-fatal error, but there's no more tokens.
+            return Ok(None);
+        }
+        let ch = ch.unwrap();
 
         match ch {
             // Single character tokens
-            '(' => Some(TokenType::LeftParen),
-            ')' => Some(TokenType::RightParen),
-            '{' => Some(TokenType::LeftBrace),
-            '}' => Some(TokenType::RightBrace),
-            ',' => Some(TokenType::Comma),
-            '.' => Some(TokenType::Dot),
-            '-' => Some(TokenType::Minus),
-            '+' => Some(TokenType::Plus),
-            ';' => Some(TokenType::Semicolon),
+            '(' => Ok(Some(TokenType::LeftParen)),
+            ')' => Ok(Some(TokenType::RightParen)),
+            '{' => Ok(Some(TokenType::LeftBrace)),
+            '}' => Ok(Some(TokenType::RightBrace)),
+            ',' => Ok(Some(TokenType::Comma)),
+            '.' => Ok(Some(TokenType::Dot)),
+            '-' => Ok(Some(TokenType::Minus)),
+            '+' => Ok(Some(TokenType::Plus)),
+            ';' => Ok(Some(TokenType::Semicolon)),
             '/' => {
                 if self.match_next_char('/') {
                     // Read ahead to end of line
                     while self.peek() != Some('\n') && !self.is_at_end() {
                         self.advance();
                     }
-                    None
+                    Ok(None)
                 } else {
-                    Some(TokenType::Slash)
+                    Ok(Some(TokenType::Slash))
                 }
             }
-            '*' => Some(TokenType::Star),
+            '*' => Ok(Some(TokenType::Star)),
 
             // One or two character tokens
             '!' => {
                 if self.match_next_char('=') {
-                    Some(TokenType::BangEqual)
+                    Ok(Some(TokenType::BangEqual))
                 } else {
-                    Some(TokenType::Bang)
+                    Ok(Some(TokenType::Bang))
                 }
             }
             '=' => {
                 if self.match_next_char('=') {
-                    Some(TokenType::EqualEqual)
+                    Ok(Some(TokenType::EqualEqual))
                 } else {
-                    Some(TokenType::Equal)
+                    Ok(Some(TokenType::Equal))
                 }
             }
             '>' => {
                 if self.match_next_char('=') {
-                    Some(TokenType::GreaterEqual)
+                    Ok(Some(TokenType::GreaterEqual))
                 } else {
-                    Some(TokenType::Greater)
+                    Ok(Some(TokenType::Greater))
                 }
             }
             '<' => {
                 if self.match_next_char('=') {
-                    Some(TokenType::LessEqual)
+                    Ok(Some(TokenType::LessEqual))
                 } else {
-                    Some(TokenType::Less)
+                    Ok(Some(TokenType::Less))
                 }
             }
 
             // Whitespace
-            ' ' | '\n' | '\t' | '\r' => None,
+            ' ' | '\n' | '\t' | '\r' => Ok(None),
 
             // Literals
             // Identifiers and reserved keywords
@@ -181,39 +183,28 @@ impl Scanner {
 
                 // If the identifier exists in our hashmap of keywords, then treat it like a keyword
                 if let Some(token) = keyword {
-                    Some(*token)
+                    Ok(Some(*token))
                 } else {
                     // Otherwise it's an identifier and we lex it as such.
-                    Some(TokenType::Identifier)
+                    Ok(Some(TokenType::Identifier))
                 }
             }
             // Strings
             '"' => {
-                let result = self.string();
-                match result {
-                    Ok(_) => Some(TokenType::String),
-                    Err(err) => {
-                        eprintln!("{err}");
-                        None
-                    }
-                }
+                self.string()?;
+                Ok(Some(TokenType::String))
             }
             // Numbers
             '0'..='9' => {
-                let result = self.number();
-                match result {
-                    Ok(_) => Some(TokenType::Number),
-                    Err(err) => {
-                        eprintln!("[line {}] {}", self.line, err);
-                        None
-                    }
-                }
+                self.number()?;
+                Ok(Some(TokenType::Number))
             }
-            _x => {
-                // TODO: Proper error type and handling here.
-                println!("[line {}] Token not supported. {}.", self.line, _x);
-                None
-            }
+            x => Err(RloxError::Scan(ScanError::new(
+                self.line,
+                self.position - 1,
+                &format!("{}", x),
+                "Character not supported",
+            ))),
         }
     }
 
@@ -315,7 +306,7 @@ impl Scanner {
             token,
             &self.source[self.start..self.current],
             self.line,
-            self.position,
+            self.position - (self.current - self.start),
         ));
     }
 

@@ -37,7 +37,7 @@ impl ScanError {
 
 #[derive(Debug)]
 pub enum ParseError {
-    ParseFailure,
+    ParseFailure(String),
     UnexpectedToken(String),
     EOF,
 }
@@ -67,7 +67,7 @@ impl fmt::Display for RloxError {
             Self::Scan(err) => {
                 write!(
                     f,
-                    "[line {}:{}] {}:{}",
+                    "Scanning Error: [line {}:{}] {}:{}",
                     err.line, err.position, err.message, err.help
                 )
             }
