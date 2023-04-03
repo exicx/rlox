@@ -68,12 +68,12 @@ impl Interpreter {
                     let result = self.evaluate(expr)?;
                     println!("{result}");
                 }
-                Stmt::Var(identifier, expr) => {
-                    let result = match expr {
+                Stmt::Var(identifier, initializer) => {
+                    let result = match initializer {
                         Some(expr) => self.evaluate(expr)?,
                         None => ExprResult::Nil,
                     };
-                    self.environment.define(identifier, result);
+                    self.environment.define(&identifier, result);
                 }
             }
         }
@@ -87,8 +87,7 @@ impl Interpreter {
             // ? TODO
             // Why am I converting from an ExprLiteral to an ExprResult
             Expr::Literal(lit) => match lit {
-                ExprLiteral::Bool(false) => Ok(ExprResult::Bool(false)),
-                ExprLiteral::Bool(true) => Ok(ExprResult::Bool(true)),
+                ExprLiteral::Bool(v) => Ok(ExprResult::Bool(v)),
                 ExprLiteral::Nil => Ok(ExprResult::Nil),
                 ExprLiteral::Number(n) => Ok(ExprResult::Number(n)),
                 ExprLiteral::String(ls) => Ok(ExprResult::String(ls)),
@@ -101,6 +100,14 @@ impl Interpreter {
             Expr::Grouping(group) => self.evaluate(*group),
             Expr::Unary(token, expr) => self.unary(token, *expr),
             Expr::Binary(expr1, token, expr2) => self.binary(*expr1, token, *expr2),
+            Expr::Assign(name, expr) => {
+                // Try to evaluate the r-value
+                let exprres = self.evaluate(*expr)?;
+                // TODO: This clone() is really gross.
+                // Assign r-value to l-value
+                self.environment.assign(&name, exprres.clone())?;
+                Ok(exprres)
+            }
         }
     }
 
@@ -260,5 +267,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_interpreter() {}
+    fn test_interpreter() {
+        todo!()
+    }
 }
