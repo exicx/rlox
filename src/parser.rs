@@ -61,7 +61,7 @@ impl Parser {
             .token_literal()
             .to_string();
 
-        let value = match self.is_any_tokens(&[TokenType::Equal]) {
+        let initializer = match self.is_any_tokens(&[TokenType::Equal]) {
             true => Some(self.expression()?),
             false => None,
         };
@@ -71,7 +71,7 @@ impl Parser {
             "Expect ';' after variable declaration",
         )?;
 
-        Ok(Stmt::Var(token, value))
+        Ok(Stmt::Var(token, initializer))
     }
 
     // Statement functions
@@ -100,10 +100,30 @@ impl Parser {
         Ok(Stmt::Expression(expr))
     }
 
+    // Assignment
+
+    fn assignment(&mut self) -> Result<Expr> {
+        let expr = self.equality()?;
+
+        if self.is_any_tokens(&[TokenType::Equal]) {
+            let value = self.assignment()?;
+
+            return if let Expr::Variable(name) = expr {
+                Ok(Expr::Assign(name, Box::new(value)))
+            } else {
+                Err(RloxError::Parse(ParseError::ParseFailure(
+                    "Invalid assignment target.".to_string(),
+                )))
+            };
+        }
+
+        Ok(expr)
+    }
+
     // Expression functions
 
     fn expression(&mut self) -> Result<Expr> {
-        self.equality()
+        self.assignment()
     }
 
     fn equality(&mut self) -> Result<Expr> {

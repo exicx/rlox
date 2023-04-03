@@ -25,6 +25,7 @@ pub enum ExprLiteral {
 
 #[derive(Debug)]
 pub enum Expr {
+    Assign(String, Box<Expr>),
     Grouping(Box<Expr>),
     Binary(Box<Expr>, TokenType, Box<Expr>),
     Unary(TokenType, Box<Expr>),
