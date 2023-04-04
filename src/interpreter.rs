@@ -51,7 +51,7 @@ impl fmt::Display for ExprResult {
 #[derive(Default)]
 pub struct Interpreter {
     // TODO some kind of stack or state tracking
-    environment: Environment,
+    env: Environment,
 }
 
 impl Interpreter {
@@ -73,7 +73,7 @@ impl Interpreter {
                         Some(expr) => self.evaluate(expr)?,
                         None => ExprResult::Nil,
                     };
-                    self.environment.define(&identifier, result);
+                    self.env.define(&identifier, result);
                 }
             }
         }
@@ -94,7 +94,7 @@ impl Interpreter {
             },
             Expr::Variable(ident) => {
                 // Accessing a variable.
-                Ok(self.environment.get(&ident)?.clone())
+                Ok(self.env.get(&ident)?.clone())
             }
             // Recursively evaluate grouping's subexpressions.
             Expr::Grouping(group) => self.evaluate(*group),
@@ -105,7 +105,7 @@ impl Interpreter {
                 let exprres = self.evaluate(*expr)?;
                 // TODO: This clone() is really gross.
                 // Assign r-value to l-value
-                self.environment.assign(&name, exprres.clone())?;
+                self.env.assign(&name, exprres.clone())?;
                 Ok(exprres)
             }
         }

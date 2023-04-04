@@ -21,10 +21,27 @@ use super::ExprResult;
 
 #[derive(Debug, Default)]
 pub struct Environment {
+    enclosing: Option<Box<Environment>>,
     values: HashMap<String, ExprResult>,
 }
 
 impl Environment {
+    // Create a new scope that links to the previous one.
+    pub fn new_scope(self) -> Environment {
+        Environment {
+            enclosing: Some(Box::new(self)),
+            ..Default::default()
+        }
+    }
+
+    // Drop the top-most scope
+    pub fn drop(mut self) -> Environment {
+        match self.enclosing.take() {
+            Some(e) => *e,
+            None => Environment::default(),
+        }
+    }
+
     pub fn define(&mut self, name: &str, res: ExprResult) {
         self.values.insert(name.to_string(), res);
     }
@@ -36,10 +53,17 @@ impl Environment {
     }
 
     // Return value if it exists, otherwise error
+    // Recurses up call stack
     pub fn get(&self, name: &str) -> Result<&ExprResult, RloxError> {
         match self.values.get(name) {
-            None => Err(RloxError::Interpret(RuntimeError::UndefinedVariable)),
             Some(res) => Ok(res),
+            None => {
+                // Check if any nested scopes have the variable name.
+                match &self.enclosing {
+                    Some(enclosing) => enclosing.get(name),
+                    None => Err(RloxError::Interpret(RuntimeError::UndefinedVariable)),
+                }
+            }
         }
     }
 
@@ -93,6 +117,49 @@ mod tests {
             Err(e) => {
                 panic!("{e}");
             }
+        }
+    }
+
+    #[test]
+    fn test_nested_get() {
+        let mut env1 = Environment::default();
+        env1.define("name1", ExprResult::Bool(true));
+        env1.define("name2", ExprResult::Bool(false));
+
+        let mut env2 = env1.new_scope();
+        env2.define("name3", ExprResult::String("Found".to_string()));
+
+        let env3 = env2.new_scope();
+
+        if env3.get("name1").is_err() {
+            panic!("Nested environments did not work");
+        }
+        if env3.get("name2").is_err() {
+            panic!("Nested environments did not work");
+        }
+
+        if env3.get("name3").is_err() {
+            panic!("Nested environments did not work");
+        }
+    }
+
+    #[test]
+    fn test_nested_assignment() {
+        let mut env1 = Environment::default();
+        env1.define("name1", ExprResult::Bool(true));
+        env1.define("name2", ExprResult::Bool(false));
+
+        let mut env2 = env1.new_scope();
+        env2.define("name3", ExprResult::String("Found".to_string()));
+
+        let mut env3 = env2.new_scope();
+
+        if env3.assign("name4", ExprResult::Number(32.)).is_ok() {
+            panic!("Shouldn't assign to unknown variable.");
+        }
+
+        if env3.assign("name1", ExprResult::Nil).is_err() {
+            panic!("Should assign to known variable in nested scope.");
         }
     }
 }
