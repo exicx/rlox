@@ -48,16 +48,23 @@ impl fmt::Display for ExprResult {
     }
 }
 
-#[derive(Default)]
 pub struct Interpreter {
-    // TODO some kind of stack or state tracking
-    env: Environment,
+    env: Option<Environment>,
+}
+
+impl Default for Interpreter {
+    fn default() -> Self {
+        Self {
+            env: Some(Environment::default()),
+        }
+    }
 }
 
 impl Interpreter {
     pub fn new() -> Interpreter {
         Default::default()
     }
+
     pub fn interpret(&mut self, program: Vec<Stmt>) -> Result<(), RloxError> {
         for statement in program {
             match statement {
@@ -73,7 +80,21 @@ impl Interpreter {
                         Some(expr) => self.evaluate(expr)?,
                         None => ExprResult::Nil,
                     };
-                    self.env.define(&identifier, result);
+                    self.env.as_mut().unwrap().define(&identifier, result);
+                }
+                Stmt::Block(block) => {
+                    // Create a new scope
+                    let env = self.env.take().unwrap();
+                    let new_env = env.new_scope();
+                    self.env = Some(new_env);
+
+                    // Execute statements
+                    self.interpret(block)?;
+
+                    // Return to previous scope
+                    let env = self.env.take().unwrap();
+                    let prev_env = env.drop();
+                    self.env = Some(prev_env);
                 }
             }
         }
@@ -94,7 +115,7 @@ impl Interpreter {
             },
             Expr::Variable(ident) => {
                 // Accessing a variable.
-                Ok(self.env.get(&ident)?.clone())
+                Ok(self.env.as_ref().unwrap().get(&ident)?.clone())
             }
             // Recursively evaluate grouping's subexpressions.
             Expr::Grouping(group) => self.evaluate(*group),
@@ -105,7 +126,7 @@ impl Interpreter {
                 let exprres = self.evaluate(*expr)?;
                 // TODO: This clone() is really gross.
                 // Assign r-value to l-value
-                self.env.assign(&name, exprres.clone())?;
+                self.env.as_mut().unwrap().assign(&name, exprres.clone())?;
                 Ok(exprres)
             }
         }

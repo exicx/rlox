@@ -80,6 +80,8 @@ impl Parser {
         if self.is_any_tokens(&[TokenType::Print]) {
             // We're a `print` statement
             self.print_statement()
+        } else if self.is_any_tokens(&[TokenType::LeftBrace]) {
+            self.block()
         } else {
             // We're an expression
             self.expression_statement()
@@ -98,6 +100,17 @@ impl Parser {
         let expr = self.expression()?;
         self.consume(TokenType::Semicolon, "Expect ';' after value")?;
         Ok(Stmt::Expression(expr))
+    }
+
+    fn block(&mut self) -> Result<Stmt> {
+        let mut block = vec![];
+
+        while !self.check(TokenType::RightBrace) && !self.is_at_end() {
+            block.push(self.declaration()?);
+        }
+
+        self.consume(TokenType::RightBrace, "Expect '}' after block.")?;
+        Ok(Stmt::Block(block))
     }
 
     // Assignment

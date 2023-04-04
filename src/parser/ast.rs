@@ -35,7 +35,8 @@ pub enum Expr {
 
 #[derive(Debug)]
 pub enum Stmt {
-    Print(Expr),
+    Block(Vec<Stmt>),
     Expression(Expr),
+    Print(Expr),
     Var(String, Option<Expr>),
 }
