@@ -68,11 +68,20 @@ impl Environment {
     }
 
     pub fn assign(&mut self, name: &str, res: ExprResult) -> Result<(), RloxError> {
-        // Check if value already exists, if it doesn't then return error
-        self.get(name)?;
-        // Otherwise, update value and return success
-        self.define(name, res);
-        Ok(())
+        match self.values.get(name) {
+            Some(_) => {
+                // Variable is defined in this environment
+                self.define(name, res);
+                Ok(())
+            }
+            None => {
+                // Variable not defined in this environment, check its parent.
+                match &mut self.enclosing {
+                    Some(enclosing) => enclosing.assign(name, res),
+                    None => Err(RloxError::Interpret(RuntimeError::UndefinedVariable)),
+                }
+            }
+        }
     }
 }
 
