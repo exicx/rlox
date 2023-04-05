@@ -17,7 +17,7 @@
 // It's used for Binary operations: +, -, /, * and Unary: -, !.
 use crate::tokens::TokenType;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ExprLiteral {
     Bool(bool),
     Number(f64),
@@ -25,7 +25,7 @@ pub enum ExprLiteral {
     Nil,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Expr {
     Assign(String, Box<Expr>),                // a = 10;
     Binary(Box<Expr>, TokenType, Box<Expr>),  // a + a
@@ -36,10 +36,16 @@ pub enum Expr {
     Variable(String),                         // r-value
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Stmt {
     Block(Vec<Stmt>), // {}
     Expression(Expr), // all kinds of expressions
+    For(
+        Option<Box<Stmt>>, // (optional) initializer
+        Option<Expr>, // (optional) condition
+        Option<Expr>, // (optional) increment
+        Box<Stmt>,         // for loop statements
+    ), // for (var i = 0; i < 100; i += 1) {}
     If(
         Expr,              // condition
         Box<Stmt>,         // statement
@@ -47,4 +53,5 @@ pub enum Stmt {
     ), // if (true) print a;
     Print(Expr),      // print "a";
     Var(String, Option<Expr>), // var declaration
+    While(Expr, Box<Stmt>), // while (true) { do_thing(); }
 }
