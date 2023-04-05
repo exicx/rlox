@@ -22,9 +22,9 @@ use crate::parser::ast::{Expr, ExprLiteral, Stmt};
 use crate::tokens::TokenType;
 use environment::Environment;
 
-// TODO why am I doing this?
+// TODO: why am I doing this?
 #[derive(Debug, PartialEq, Clone)]
-pub enum ExprResult {
+enum ExprResult {
     Bool(bool),
     Number(f64),
     String(String),
@@ -96,6 +96,13 @@ impl Interpreter {
                     let prev_env = env.drop();
                     self.env = Some(prev_env);
                 }
+                Stmt::If(condition, then_branch, else_branch) => {
+                    if is_truthy(&self.evaluate(condition)?) {
+                        self.interpret(vec![*then_branch])?;
+                    } else if else_branch.is_some() {
+                        self.interpret(vec![*else_branch.unwrap()])?;
+                    }
+                }
             }
         }
 
@@ -128,6 +135,26 @@ impl Interpreter {
                 // Assign r-value to l-value
                 self.env.as_mut().unwrap().assign(&name, exprres.clone())?;
                 Ok(exprres)
+            }
+            Expr::Logical(left, operator, right) => {
+                let left = self.evaluate(*left)?;
+
+                // short-circuit. only evaluate the right if needed.
+
+                if operator == TokenType::Or {
+                    if is_truthy(&left) {
+                        // operator == or, and left is true
+                        // so return true
+                        return Ok(left);
+                    }
+                } else if !is_truthy(&left) {
+                    // operator == and, but left is false
+                    // so return false
+                    return Ok(left);
+                }
+
+                // otherwise, return whatever the right side is after evaluating it.
+                Ok(self.evaluate(*right)?)
             }
         }
     }

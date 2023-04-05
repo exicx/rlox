@@ -20,7 +20,7 @@ use crate::errors::{RloxError, RuntimeError};
 use super::ExprResult;
 
 #[derive(Debug, Default)]
-pub struct Environment {
+pub(super) struct Environment {
     enclosing: Option<Box<Environment>>,
     values: HashMap<String, ExprResult>,
 }
