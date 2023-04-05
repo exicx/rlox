@@ -2,6 +2,6 @@
 (( )){} // grouping stuff
 !*+-/=<> <= == // operators
 
-var 900..;
-var 900.1.1;
-var 900.;
+900..; // should error "No digits after decimal"
+900.1.1; // should error "Number contained two or more decimals"
+900.; // should error "No digits after decimal"
