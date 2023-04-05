@@ -47,6 +47,7 @@ impl Parser {
         statements
     }
 
+    // Check for variable declarations
     fn declaration(&mut self) -> Result<Stmt> {
         if self.is_any_tokens(&[TokenType::Var]) {
             self.var_declaration()
@@ -55,6 +56,7 @@ impl Parser {
         }
     }
 
+    // Handle variable declaration
     fn var_declaration(&mut self) -> Result<Stmt> {
         let token = self
             .consume(TokenType::Identifier, "Expect variable name.")?
@@ -79,44 +81,44 @@ impl Parser {
     fn statement(&mut self) -> Result<Stmt> {
         if self.is_any_tokens(&[TokenType::If]) {
             // If condition
-            self.if_statement()
+            self.if_stmt()
         } else if self.is_any_tokens(&[TokenType::Print]) {
             // We're a `print` statement
-            self.print_statement()
+            self.print_stmt()
         } else if self.is_any_tokens(&[TokenType::LeftBrace]) {
-            self.block_statement()
+            // New block/scope
+            self.block_stmt()
+        } else if self.is_any_tokens(&[TokenType::While]) {
+            // While loop
+            self.while_stmt()
+        } else if self.is_any_tokens(&[TokenType::For]) {
+            // For loop
+            self.for_stmt()
         } else {
             // We're an expression
-            self.expression_statement()
+            self.expression_stmt()
         }
     }
 
     // Evaluate the expression and return Stmt::Print(result)
-    fn print_statement(&mut self) -> Result<Stmt> {
+    fn print_stmt(&mut self) -> Result<Stmt> {
         let value = self.expression()?;
         self.consume(TokenType::Semicolon, "Expect ';' after value.")?;
         Ok(Stmt::Print(value))
     }
 
-    // Evaluate the expression and return Stmt::Expression(result)
-    fn expression_statement(&mut self) -> Result<Stmt> {
-        let expr = self.expression()?;
-        self.consume(TokenType::Semicolon, "Expect ';' after value")?;
-        Ok(Stmt::Expression(expr))
-    }
-
-    fn block_statement(&mut self) -> Result<Stmt> {
-        let mut block = vec![];
+    fn block_stmt(&mut self) -> Result<Stmt> {
+        let mut stmts = vec![];
 
         while !self.check(TokenType::RightBrace) && !self.is_at_end() {
-            block.push(self.declaration()?);
+            stmts.push(self.declaration()?);
         }
 
         self.consume(TokenType::RightBrace, "Expect '}' after block.")?;
-        Ok(Stmt::Block(block))
+        Ok(Stmt::Block(stmts))
     }
 
-    fn if_statement(&mut self) -> Result<Stmt> {
+    fn if_stmt(&mut self) -> Result<Stmt> {
         self.consume(TokenType::LeftParen, "Expect '(' after 'if'.")?;
 
         let condition = self.expression()?;
@@ -133,7 +135,61 @@ impl Parser {
         Ok(Stmt::If(condition, Box::new(then_branch), else_branch))
     }
 
+    fn while_stmt(&mut self) -> Result<Stmt> {
+        self.consume(TokenType::LeftParen, "Expect '(' after 'while'.")?;
+
+        let condition = self.expression()?;
+
+        self.consume(TokenType::RightParen, "Expect ')' after while condition.")?;
+
+        let stmts = self.statement()?;
+
+        Ok(Stmt::While(condition, Box::new(stmts)))
+    }
+
+    fn for_stmt(&mut self) -> Result<Stmt> {
+        self.consume(TokenType::LeftParen, "Expect '(' after 'for'.")?;
+
+        // Handle optional initializer
+        let start = match self.is_any_tokens(&[TokenType::Semicolon]) {
+            true => None,
+            false => Some(Box::new(self.declaration()?)),
+        };
+
+        // var_declaration() consumes the terminating ;
+
+        // Handle optional condition before each loop
+        let condition = match self.is_any_tokens(&[TokenType::Semicolon]) {
+            true => None,
+            false => Some(self.expression()?),
+        };
+
+        self.consume(TokenType::Semicolon, "Expect ';' after condition.")?;
+
+        // Handle optional increment expression after each loop
+        let end = match self.is_any_tokens(&[TokenType::Semicolon]) {
+            true => None,
+            false => Some(self.expression()?),
+        };
+
+        self.consume(TokenType::RightParen, "Expect ')' after increment.")?;
+
+        let stmts = Box::new(self.statement()?);
+
+        Ok(Stmt::For(start, condition, end, stmts))
+    }
+
+    // Evaluate the expression and return Stmt::Expression(result)
+    fn expression_stmt(&mut self) -> Result<Stmt> {
+        let expr = self.expression()?;
+        self.consume(TokenType::Semicolon, "Expect ';' after value")?;
+        Ok(Stmt::Expression(expr))
+    }
+
     // Expression functions
+    // Descend!
+    // Assignment > OR > AND > equality > comparison
+    // > term > factor > unary > primary
 
     fn expression(&mut self) -> Result<Expr> {
         self.assignment()
