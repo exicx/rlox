@@ -147,16 +147,18 @@ impl Parser {
         Ok(Stmt::While(condition, Box::new(stmts)))
     }
 
+    // For loops are de-sugared into a while loop with optional initializer
     fn for_stmt(&mut self) -> Result<Stmt> {
         self.consume(TokenType::LeftParen, "Expect '(' after 'for'.")?;
 
         // Handle optional initializer
-        let start = match self.is_any_tokens(&[TokenType::Semicolon]) {
-            true => None,
-            false => Some(Box::new(self.declaration()?)),
+        let initializer = match self.is_any_tokens(&[TokenType::Semicolon]) {
+            true => None, // no initializer
+            false => match self.is_any_tokens(&[TokenType::Var]) {
+                true => Some(self.var_declaration()?), // new variable declaration
+                false => Some(self.expression_stmt()?), // expression
+            },
         };
-
-        // var_declaration() consumes the terminating ;
 
         // Handle optional condition before each loop
         let condition = match self.is_any_tokens(&[TokenType::Semicolon]) {
@@ -167,16 +169,40 @@ impl Parser {
         self.consume(TokenType::Semicolon, "Expect ';' after condition.")?;
 
         // Handle optional increment expression after each loop
-        let end = match self.is_any_tokens(&[TokenType::Semicolon]) {
+        let increment = match self.is_any_tokens(&[TokenType::Semicolon]) {
             true => None,
             false => Some(self.expression()?),
         };
 
         self.consume(TokenType::RightParen, "Expect ')' after increment.")?;
 
-        let stmts = Box::new(self.statement()?);
+        // We start de-sugaring the for() by appending the increment expression to the end
+        // of the body. Then we'll transform the body into the body of a while loop and
+        // attach its condition. Finally, we prepend it with the initializer.
+        let mut body = self.statement()?;
 
-        Ok(Stmt::For(start, condition, end, stmts))
+        // if there's an increment, append it to the body
+        if let Some(expr) = increment {
+            body = Stmt::Block(vec![body, Stmt::Expression(expr)]);
+        }
+
+        match condition {
+            None => {
+                // Make the condition `true` and create a while (true) loop
+                body = Stmt::While(Expr::Literal(ExprLiteral::Bool(true)), Box::new(body));
+            }
+            Some(expr) => {
+                // Otherwise, create a while (condition) loop
+                body = Stmt::While(expr, Box::new(body));
+            }
+        }
+
+        // Prepend the initializer if it exists
+        if let Some(expr) = initializer {
+            body = Stmt::Block(vec![expr, body]);
+        }
+
+        Ok(body)
     }
 
     // Evaluate the expression and return Stmt::Expression(result)
