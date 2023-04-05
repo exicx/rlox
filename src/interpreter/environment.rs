@@ -161,5 +161,12 @@ mod tests {
         if env3.assign("name1", ExprResult::Nil).is_err() {
             panic!("Should assign to known variable in nested scope.");
         }
+
+        let env2 = env3.drop();
+        let env1 = env2.drop();
+
+        if env1.get("name1").unwrap() != &ExprResult::Nil {
+            panic!("Did not overwrite variable in parent scope.");
+        }
     }
 }
