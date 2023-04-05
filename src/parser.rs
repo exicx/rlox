@@ -77,11 +77,14 @@ impl Parser {
     // Statement functions
 
     fn statement(&mut self) -> Result<Stmt> {
-        if self.is_any_tokens(&[TokenType::Print]) {
+        if self.is_any_tokens(&[TokenType::If]) {
+            // If condition
+            self.if_statement()
+        } else if self.is_any_tokens(&[TokenType::Print]) {
             // We're a `print` statement
             self.print_statement()
         } else if self.is_any_tokens(&[TokenType::LeftBrace]) {
-            self.block()
+            self.block_statement()
         } else {
             // We're an expression
             self.expression_statement()
@@ -102,7 +105,7 @@ impl Parser {
         Ok(Stmt::Expression(expr))
     }
 
-    fn block(&mut self) -> Result<Stmt> {
+    fn block_statement(&mut self) -> Result<Stmt> {
         let mut block = vec![];
 
         while !self.check(TokenType::RightBrace) && !self.is_at_end() {
@@ -113,10 +116,31 @@ impl Parser {
         Ok(Stmt::Block(block))
     }
 
-    // Assignment
+    fn if_statement(&mut self) -> Result<Stmt> {
+        self.consume(TokenType::LeftParen, "Expect '(' after 'if'.")?;
+
+        let condition = self.expression()?;
+
+        self.consume(TokenType::RightParen, "Expect ')' after if condition.")?;
+
+        let then_branch = self.statement()?;
+        let mut else_branch: Option<Box<Stmt>> = None;
+
+        if self.is_any_tokens(&[TokenType::Else]) {
+            else_branch = Some(Box::new(self.statement()?));
+        }
+
+        Ok(Stmt::If(condition, Box::new(then_branch), else_branch))
+    }
+
+    // Expression functions
+
+    fn expression(&mut self) -> Result<Expr> {
+        self.assignment()
+    }
 
     fn assignment(&mut self) -> Result<Expr> {
-        let expr = self.equality()?;
+        let expr = self.or()?;
 
         if self.is_any_tokens(&[TokenType::Equal]) {
             let value = self.assignment()?;
@@ -133,10 +157,28 @@ impl Parser {
         Ok(expr)
     }
 
-    // Expression functions
+    fn or(&mut self) -> Result<Expr> {
+        let mut expr = self.and()?;
 
-    fn expression(&mut self) -> Result<Expr> {
-        self.assignment()
+        while self.is_any_tokens(&[TokenType::Or]) {
+            let operator = self.previous().token_type();
+            let right = self.and()?;
+            expr = Expr::Logical(Box::new(expr), operator, Box::new(right));
+        }
+
+        Ok(expr)
+    }
+
+    fn and(&mut self) -> Result<Expr> {
+        let mut expr = self.equality()?;
+
+        while self.is_any_tokens(&[TokenType::And]) {
+            let operator = self.previous().token_type();
+            let right = self.equality()?;
+            expr = Expr::Logical(Box::new(expr), operator, Box::new(right));
+        }
+
+        Ok(expr)
     }
 
     fn equality(&mut self) -> Result<Expr> {
