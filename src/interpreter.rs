@@ -22,6 +22,8 @@ use crate::parser::ast::{Expr, ExprLiteral, Stmt};
 use crate::tokens::TokenType;
 use environment::Environment;
 
+type Result<T> = std::result::Result<T, RloxError>;
+
 // TODO: why am I doing this?
 #[derive(Debug, PartialEq, Clone)]
 enum ExprResult {
@@ -65,7 +67,7 @@ impl Interpreter {
         Default::default()
     }
 
-    pub fn interpret(&mut self, program: Vec<Stmt>) -> Result<(), RloxError> {
+    pub fn interpret(&mut self, program: Vec<Stmt>) -> Result<()> {
         for statement in program {
             match statement {
                 Stmt::Expression(expr) => {
@@ -109,7 +111,7 @@ impl Interpreter {
         Ok(())
     }
 
-    fn evaluate(&mut self, expr: Expr) -> Result<ExprResult, RloxError> {
+    fn evaluate(&mut self, expr: Expr) -> Result<ExprResult> {
         match expr {
             // Evaluate literals
             // ? TODO
@@ -162,7 +164,7 @@ impl Interpreter {
     // TODO: This is pretty sloppy. Cleanup this logic.
     // We have two tokens, ! and -, and two possible types Number and Bool.
     // Evaluate the 4 possible inputs.
-    fn unary(&mut self, token: TokenType, unary: Expr) -> Result<ExprResult, RloxError> {
+    fn unary(&mut self, token: TokenType, unary: Expr) -> Result<ExprResult> {
         if token != TokenType::Bang && token != TokenType::Minus {
             unimplemented!(
                 "Interpreter does not support this unary operator: {:?}",
@@ -197,12 +199,7 @@ impl Interpreter {
         }
     }
 
-    fn binary(
-        &mut self,
-        expr1: Expr,
-        token: TokenType,
-        expr2: Expr,
-    ) -> Result<ExprResult, RloxError> {
+    fn binary(&mut self, expr1: Expr, token: TokenType, expr2: Expr) -> Result<ExprResult> {
         use self::ExprResult::{Bool, Number, String};
 
         let left = self.evaluate(expr1)?;
@@ -312,6 +309,7 @@ fn is_equal(left: &ExprResult, right: &ExprResult) -> bool {
 
 #[cfg(test)]
 mod tests {
+    #[allow(unused_imports)]
     use super::*;
 
     #[test]
