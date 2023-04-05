@@ -69,40 +69,78 @@ impl Interpreter {
 
     pub fn interpret(&mut self, program: Vec<Stmt>) -> Result<()> {
         for statement in program {
-            match statement {
-                Stmt::Expression(expr) => {
-                    self.evaluate(expr)?;
-                }
-                Stmt::Print(expr) => {
-                    let result = self.evaluate(expr)?;
-                    println!("{result}");
-                }
-                Stmt::Var(identifier, initializer) => {
-                    let result = match initializer {
-                        Some(expr) => self.evaluate(expr)?,
-                        None => ExprResult::Nil,
-                    };
-                    self.env.as_mut().unwrap().define(&identifier, result);
-                }
-                Stmt::Block(block) => {
-                    // Create a new scope
-                    let env = self.env.take().unwrap();
-                    let new_env = env.new_scope();
-                    self.env = Some(new_env);
+            self.execute(statement)?;
+        }
 
-                    // Execute statements
-                    self.interpret(block)?;
+        Ok(())
+    }
 
-                    // Return to previous scope
-                    let env = self.env.take().unwrap();
-                    let prev_env = env.drop();
-                    self.env = Some(prev_env);
+    fn execute(&mut self, stmt: Stmt) -> Result<()> {
+        match stmt {
+            Stmt::Expression(expr) => {
+                self.evaluate(expr)?;
+            }
+            Stmt::Print(expr) => {
+                let result = self.evaluate(expr)?;
+                println!("{result}");
+            }
+            Stmt::Var(identifier, initializer) => {
+                let result = match initializer {
+                    Some(expr) => self.evaluate(expr)?,
+                    None => ExprResult::Nil,
+                };
+                self.env.as_mut().unwrap().define(&identifier, result);
+            }
+            Stmt::Block(block) => {
+                // Create a new scope
+                let env = self.env.take().unwrap();
+                let new_env = env.new_scope();
+                self.env = Some(new_env);
+
+                // Execute statements
+                for stmt in block {
+                    self.execute(stmt)?;
                 }
-                Stmt::If(condition, then_branch, else_branch) => {
-                    if is_truthy(&self.evaluate(condition)?) {
-                        self.interpret(vec![*then_branch])?;
-                    } else if else_branch.is_some() {
-                        self.interpret(vec![*else_branch.unwrap()])?;
+
+                // Return to previous scope
+                let env = self.env.take().unwrap();
+                let prev_env = env.drop();
+                self.env = Some(prev_env);
+            }
+
+            Stmt::If(condition, then_branch, else_branch) => {
+                if is_truthy(&self.evaluate(condition)?) {
+                    self.execute(*then_branch)?;
+                } else if else_branch.is_some() {
+                    self.execute(*else_branch.unwrap())?;
+                }
+            }
+            // TODO: Look into this.
+            // Can we do something besides clone() to re-evaluate the condition?
+            Stmt::While(condition, stmt) => {
+                while is_truthy(&self.evaluate(condition.clone())?) {
+                    self.execute(*stmt.clone())?;
+                }
+            }
+            Stmt::For(initializer, condition, increment, stmt) => {
+                if let Some(stmt) = initializer {
+                    self.execute(*stmt)?;
+                }
+
+                loop {
+                    // Run condition and break if false
+                    if let Some(expr) = condition.clone() {
+                        let eval = self.evaluate(expr)?;
+                        if !is_truthy(&eval) {
+                            break;
+                        }
+                    }
+
+                    self.execute(*stmt.clone())?;
+
+                    // Run post-condition (increment)
+                    if let Some(expr) = increment.clone() {
+                        self.evaluate(expr)?;
                     }
                 }
             }
