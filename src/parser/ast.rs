@@ -40,12 +40,6 @@ pub enum Expr {
 pub enum Stmt {
     Block(Vec<Stmt>), // {}
     Expression(Expr), // all kinds of expressions
-    For(
-        Option<Box<Stmt>>, // (optional) initializer
-        Option<Expr>, // (optional) condition
-        Option<Expr>, // (optional) increment
-        Box<Stmt>,         // for loop statements
-    ), // for (var i = 0; i < 100; i += 1) {}
     If(
         Expr,              // condition
         Box<Stmt>,         // statement

@@ -122,28 +122,6 @@ impl Interpreter {
                     self.execute(*stmt.clone())?;
                 }
             }
-            Stmt::For(initializer, condition, increment, stmt) => {
-                if let Some(stmt) = initializer {
-                    self.execute(*stmt)?;
-                }
-
-                loop {
-                    // Run condition and break if false
-                    if let Some(expr) = condition.clone() {
-                        let eval = self.evaluate(expr)?;
-                        if !is_truthy(&eval) {
-                            break;
-                        }
-                    }
-
-                    self.execute(*stmt.clone())?;
-
-                    // Run post-condition (increment)
-                    if let Some(expr) = increment.clone() {
-                        self.evaluate(expr)?;
-                    }
-                }
-            }
         }
 
         Ok(())
