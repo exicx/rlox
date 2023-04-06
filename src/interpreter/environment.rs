@@ -17,7 +17,7 @@ use std::collections::HashMap;
 
 use crate::errors::{Result, RloxError, RuntimeError};
 
-use super::ExprResult;
+use super::LoxType;
 
 #[derive(Debug, Default)]
 pub(super) struct Environment {

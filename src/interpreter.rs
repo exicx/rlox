@@ -24,26 +24,26 @@ use environment::Environment;
 
 // TODO: why am I doing this?
 #[derive(Debug, PartialEq, Clone)]
-enum ExprResult {
+enum LoxType {
     Bool(bool),
     Number(f64),
     String(String),
     Nil,
 }
 
-impl fmt::Display for ExprResult {
+impl fmt::Display for LoxType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ExprResult::Bool(v) => {
+            LoxType::Bool(v) => {
                 if *v {
                     write!(f, "true")
                 } else {
                     write!(f, "false")
                 }
             }
-            ExprResult::Nil => write!(f, "nil"),
-            ExprResult::Number(n) => write!(f, "{}", n),
-            ExprResult::String(s) => write!(f, "{s}"),
+            LoxType::Nil => write!(f, "nil"),
+            LoxType::Number(n) => write!(f, "{}", n),
+            LoxType::String(s) => write!(f, "{s}"),
         }
     }
 }
@@ -61,7 +61,7 @@ impl Default for Interpreter {
 }
 
 impl Interpreter {
-    pub fn new() -> Interpreter {
+    pub fn new() -> Self {
         Default::default()
     }
 
@@ -85,7 +85,7 @@ impl Interpreter {
             Stmt::Var(identifier, initializer) => {
                 let result = match initializer {
                     Some(expr) => self.evaluate(expr)?,
-                    None => ExprResult::Nil,
+                    None => LoxType::Nil,
                 };
                 self.env.as_mut().unwrap().define(&identifier, result);
             }
@@ -124,16 +124,16 @@ impl Interpreter {
         Ok(())
     }
 
-    fn evaluate(&mut self, expr: Expr) -> Result<ExprResult> {
+    fn evaluate(&mut self, expr: Expr) -> Result<LoxType> {
         match expr {
             // Evaluate literals
             // ? TODO
-            // Why am I converting from an ExprLiteral to an ExprResult
+            // Why am I converting from an ExprLiteral to an LoxType
             Expr::Literal(lit) => match lit {
-                ExprLiteral::Bool(v) => Ok(ExprResult::Bool(v)),
-                ExprLiteral::Nil => Ok(ExprResult::Nil),
-                ExprLiteral::Number(n) => Ok(ExprResult::Number(n)),
-                ExprLiteral::String(ls) => Ok(ExprResult::String(ls)),
+                ExprLiteral::Bool(v) => Ok(LoxType::Bool(v)),
+                ExprLiteral::Nil => Ok(LoxType::Nil),
+                ExprLiteral::Number(n) => Ok(LoxType::Number(n)),
+                ExprLiteral::String(ls) => Ok(LoxType::String(ls)),
             },
             Expr::Variable(ident) => {
                 // Accessing a variable.
@@ -171,13 +171,33 @@ impl Interpreter {
                 // otherwise, return whatever the right side is after evaluating it.
                 Ok(self.evaluate(*right)?)
             }
+            // TODO: Use token to improve interpreter error messages.
+            Expr::Call(callee, _token, arguments) => {
+                let callee = self.evaluate(*callee)?;
+
+                let mut args = vec![];
+                for argument in arguments {
+                    args.push(self.evaluate(argument)?);
+                }
+
+                // Convert callee into a function
+                let fun: Function = Function::try_from(callee)?;
+
+                // Make sure we have the correct number of arguments,
+                // Then call the function
+                if fun.arity() as usize != args.len() {
+                    Err(RloxError::Interpret(RuntimeError::NotEnoughArguments))
+                } else {
+                    Ok(fun.call(self, &args)?)
+                }
+            }
         }
     }
 
     // TODO: This is pretty sloppy. Cleanup this logic.
     // We have two tokens, ! and -, and two possible types Number and Bool.
     // Evaluate the 4 possible inputs.
-    fn unary(&mut self, token: TokenType, unary: Expr) -> Result<ExprResult> {
+    fn unary(&mut self, token: TokenType, unary: Expr) -> Result<LoxType> {
         if token != TokenType::Bang && token != TokenType::Minus {
             unimplemented!(
                 "Interpreter does not support this unary operator: {:?}",
@@ -185,9 +205,9 @@ impl Interpreter {
             );
         }
 
-        let right: ExprResult = self.evaluate(unary)?;
+        let right: LoxType = self.evaluate(unary)?;
         match right {
-            ExprResult::String(_) | ExprResult::Nil => {
+            LoxType::String(_) | LoxType::Nil => {
                 return Err(RloxError::Interpret(RuntimeError::TypeComparison(format!(
                     "Cannot apply unary operator \"{token:?}\" to expression."
                 ))));
@@ -196,12 +216,12 @@ impl Interpreter {
         }
 
         match token {
-            TokenType::Bang => Ok(ExprResult::Bool(!is_truthy(&right))),
+            TokenType::Bang => Ok(LoxType::Bool(!is_truthy(&right))),
             TokenType::Minus => {
-                if let ExprResult::Number(n) = right {
-                    Ok(ExprResult::Number(-n))
-                } else if let ExprResult::Bool(v) = right {
-                    Ok(ExprResult::Bool(!v))
+                if let LoxType::Number(n) = right {
+                    Ok(LoxType::Number(-n))
+                } else if let LoxType::Bool(v) = right {
+                    Ok(LoxType::Bool(!v))
                 } else {
                     unimplemented!("Not possible to get here.")
                 }
@@ -212,8 +232,8 @@ impl Interpreter {
         }
     }
 
-    fn binary(&mut self, expr1: Expr, token: TokenType, expr2: Expr) -> Result<ExprResult> {
-        use self::ExprResult::{Bool, Number, String};
+    fn binary(&mut self, expr1: Expr, token: TokenType, expr2: Expr) -> Result<LoxType> {
+        use self::LoxType::{Bool, Number, String};
 
         let left = self.evaluate(expr1)?;
         let right = self.evaluate(expr2)?;
@@ -308,15 +328,15 @@ impl Interpreter {
     }
 }
 
-fn is_truthy(expr: &ExprResult) -> bool {
+fn is_truthy(expr: &LoxType) -> bool {
     match expr {
-        ExprResult::Bool(v) => *v,
-        ExprResult::Nil => false,
+        LoxType::Bool(v) => *v,
+        LoxType::Nil => false,
         _ => true,
     }
 }
 
-fn is_equal(left: &ExprResult, right: &ExprResult) -> bool {
+fn is_equal(left: &LoxType, right: &LoxType) -> bool {
     *left == *right
 }
 
