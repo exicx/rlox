@@ -13,13 +13,15 @@
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
 
-mod environment;
+mod callable; // Traits for callable objects (functions, classes, lambdas)
+mod environment; // Call stack
 
 use std::fmt;
 
 use crate::errors::{Result, RloxError, RuntimeError};
 use crate::parser::ast::{Expr, ExprLiteral, Stmt};
 use crate::tokens::TokenType;
+use callable::{Callable, Function};
 use environment::Environment;
 
 // TODO: why am I doing this?
