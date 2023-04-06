@@ -28,6 +28,7 @@ enum LoxType {
     Bool(bool),
     Number(f64),
     String(String),
+    // Function(String, u16),
     Nil,
 }
 
@@ -49,14 +50,18 @@ impl fmt::Display for LoxType {
 }
 
 pub struct Interpreter {
-    env: Option<Environment>,
+    env: Environment,
 }
 
 impl Default for Interpreter {
     fn default() -> Self {
-        Self {
-            env: Some(Environment::default()),
-        }
+        let env = Environment::default();
+
+        // for native in Natives::default() {
+        //     self.env.define(native);
+        // }
+
+        Self { env }
     }
 }
 
@@ -87,13 +92,10 @@ impl Interpreter {
                     Some(expr) => self.evaluate(expr)?,
                     None => LoxType::Nil,
                 };
-                self.env.as_mut().unwrap().define(&identifier, result);
+                self.env.define(&identifier, result);
             }
             Stmt::Block(block) => {
-                // Create a new scope
-                let env = self.env.take().unwrap();
-                let new_env = env.new_scope();
-                self.env = Some(new_env);
+                self.env.new_scope();
 
                 // Execute statements
                 for stmt in block {
@@ -101,9 +103,7 @@ impl Interpreter {
                 }
 
                 // Return to previous scope
-                let env = self.env.take().unwrap();
-                let prev_env = env.drop();
-                self.env = Some(prev_env);
+                self.env.drop();
             }
             Stmt::If(condition, then_branch, else_branch) => {
                 if is_truthy(&self.evaluate(condition)?) {
@@ -137,7 +137,7 @@ impl Interpreter {
             },
             Expr::Variable(ident) => {
                 // Accessing a variable.
-                Ok(self.env.as_ref().unwrap().get(&ident)?.clone())
+                Ok(self.env.get(&ident)?.clone())
             }
             // Recursively evaluate grouping's subexpressions.
             Expr::Grouping(group) => self.evaluate(*group),
@@ -148,7 +148,7 @@ impl Interpreter {
                 let exprres = self.evaluate(*expr)?;
                 // TODO: This clone() is really gross.
                 // Assign r-value to l-value
-                self.env.as_mut().unwrap().assign(&name, exprres.clone())?;
+                self.env.assign(&name, exprres.clone())?;
                 Ok(exprres)
             }
             Expr::Logical(left, operator, right) => {

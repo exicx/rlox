@@ -20,67 +20,95 @@ use crate::errors::{Result, RloxError, RuntimeError};
 use super::LoxType;
 
 #[derive(Debug, Default)]
+struct Scope {
+    values: HashMap<String, LoxType>,
+}
+
+#[derive(Debug)]
 pub(super) struct Environment {
-    enclosing: Option<Box<Environment>>,
-    values: HashMap<String, ExprResult>,
+    scopes: Vec<Scope>,
+}
+
+impl Default for Environment {
+    fn default() -> Self {
+        let mut scopes = Vec::new();
+        scopes.reserve(8);
+        scopes.push(Scope::default());
+
+        Self { scopes }
+    }
 }
 
 impl Environment {
-    // Create a new scope that links to the previous one.
-    pub fn new_scope(self) -> Environment {
-        Environment {
-            enclosing: Some(Box::new(self)),
-            ..Default::default()
-        }
+    // Create a new scope at the end of the queue
+    pub fn new_scope(&mut self) {
+        self.scopes.push(Scope::default());
     }
 
     // Drop the top-most scope
-    pub fn drop(mut self) -> Environment {
-        match self.enclosing.take() {
-            Some(e) => *e,
-            None => Environment::default(),
+    // self.scopes[0] is the global scope, don't allow dropping
+    // that one.
+    pub fn drop(&mut self) {
+        if self.scopes.len() > 1 {
+            self.scopes.pop();
         }
     }
 
-    pub fn define(&mut self, name: &str, res: ExprResult) {
-        self.values.insert(name.to_string(), res);
+    // Define a new type
+    pub fn define(&mut self, name: &str, res: LoxType) {
+        self.scopes
+            .last_mut()
+            .unwrap()
+            .values
+            .insert(name.to_string(), res);
     }
 
     // Drop value
     #[allow(dead_code)]
     pub fn undefine(&mut self, name: &str) {
-        self.values.remove(name);
+        self.scopes.last_mut().unwrap().values.remove(name);
     }
 
     // Return value if it exists, otherwise error
     // Recurses up call stack
-    pub fn get(&self, name: &str) -> Result<&ExprResult> {
-        match self.values.get(name) {
-            Some(res) => Ok(res),
-            None => {
-                // Check if any nested scopes have the variable name.
-                match &self.enclosing {
-                    Some(enclosing) => enclosing.get(name),
-                    None => Err(RloxError::Interpret(RuntimeError::UndefinedVariable)),
-                }
+    pub fn get(&self, name: &str) -> Result<&LoxType> {
+        let stack_iter = self.scopes.iter().rev();
+        for stack in stack_iter {
+            match stack.values.get(name) {
+                None => continue,
+                Some(expr) => return Ok(expr),
             }
         }
+
+        Err(RloxError::Interpret(RuntimeError::UndefinedVariable))
     }
 
-    pub fn assign(&mut self, name: &str, res: ExprResult) -> Result<()> {
-        match self.values.get(name) {
-            Some(_) => {
-                // Variable is defined in this environment
-                self.define(name, res);
-                Ok(())
+    pub fn assign(&mut self, name: &str, res: LoxType) -> Result<()> {
+        // return error if variable isn't defined.
+        self.get(name)
+            .map_err(|_| RloxError::Interpret(RuntimeError::UndefinedVariableAssignment))?;
+
+        let stack_iter = self.scopes.iter_mut().rev();
+        for stack in stack_iter {
+            if stack.values.get(name).is_none() {
+                continue;
             }
-            None => {
-                // Variable not defined in this environment, check its parent.
-                match &mut self.enclosing {
-                    Some(enclosing) => enclosing.assign(name, res),
-                    None => Err(RloxError::Interpret(RuntimeError::UndefinedVariable)),
-                }
-            }
+            stack.values.insert(name.to_string(), res);
+            break;
+        }
+
+        Ok(())
+    }
+
+    // Return a mutable reference to the global environment
+    pub fn define_globals(&mut self, name: &str, res: LoxType) {
+        self.scopes[0].values.insert(name.to_string(), res);
+    }
+
+    pub fn get_globals(&mut self, name: &str) -> Result<&LoxType> {
+        match self.scopes[0].values.get(name) {
+            Some(expr) => Ok(expr),
+            None => Err(RloxError::Interpret(RuntimeError::UndefinedVariable)),
         }
     }
 }
@@ -93,19 +121,19 @@ mod tests {
     fn test_basics() {
         let mut env = Environment::default();
 
-        env.define("var1", ExprResult::Bool(true));
-        env.define("var2", ExprResult::Nil);
+        env.define("var1", LoxType::Bool(true));
+        env.define("var2", LoxType::Nil);
 
-        assert_eq!(env.get("var2"), Ok(&ExprResult::Nil));
-        assert_eq!(env.get("var1"), Ok(&ExprResult::Bool(true)));
+        assert_eq!(env.get("var2"), Ok(&LoxType::Nil));
+        assert_eq!(env.get("var1"), Ok(&LoxType::Bool(true)));
     }
 
     #[test]
     fn test_assignment() {
         let mut env = Environment::default();
 
-        env.define("var_test", ExprResult::Bool(true));
-        match env.assign("var_test", ExprResult::Bool(false)) {
+        env.define("var_test", LoxType::Bool(true));
+        match env.assign("var_test", LoxType::Bool(false)) {
             Ok(_) => (),
             Err(e) => {
                 panic!("{e}");
@@ -118,10 +146,10 @@ mod tests {
     fn test_failing_assignment() {
         let mut env = Environment::default();
 
-        env.define("fail_me", ExprResult::Bool(true));
+        env.define("fail_me", LoxType::Bool(true));
 
         // Fails because "var_test" was not previously defined
-        match env.assign("var_test", ExprResult::Bool(false)) {
+        match env.assign("var_test", LoxType::Bool(false)) {
             Ok(_) => (),
             Err(e) => {
                 panic!("{e}");
@@ -131,51 +159,75 @@ mod tests {
 
     #[test]
     fn test_nested_get() {
-        let mut env1 = Environment::default();
-        env1.define("name1", ExprResult::Bool(true));
-        env1.define("name2", ExprResult::Bool(false));
+        let mut root = Environment::default();
+        root.define("name1", LoxType::Bool(true));
+        root.define("name2", LoxType::Bool(false));
+        root.new_scope();
+        root.define("name3", LoxType::String("Found".to_string()));
+        root.new_scope();
 
-        let mut env2 = env1.new_scope();
-        env2.define("name3", ExprResult::String("Found".to_string()));
-
-        let env3 = env2.new_scope();
-
-        if env3.get("name1").is_err() {
+        if root.get("name1").is_err() {
             panic!("Nested environments did not work");
         }
-        if env3.get("name2").is_err() {
+        if root.get("name2").is_err() {
             panic!("Nested environments did not work");
         }
 
-        if env3.get("name3").is_err() {
+        if root.get("name3").is_err() {
             panic!("Nested environments did not work");
         }
     }
 
     #[test]
     fn test_nested_assignment() {
-        let mut env1 = Environment::default();
-        env1.define("name1", ExprResult::Bool(true));
-        env1.define("name2", ExprResult::Bool(false));
+        let mut root = Environment::default();
+        root.define("name1", LoxType::Bool(true));
+        root.define("name2", LoxType::Bool(false));
 
-        let mut env2 = env1.new_scope();
-        env2.define("name3", ExprResult::String("Found".to_string()));
+        root.new_scope();
+        root.define("name3", LoxType::String("Found".to_string()));
 
-        let mut env3 = env2.new_scope();
-
-        if env3.assign("name4", ExprResult::Number(32.)).is_ok() {
+        root.new_scope();
+        if root.assign("name4", LoxType::Number(32.)).is_ok() {
             panic!("Shouldn't assign to unknown variable.");
         }
-
-        if env3.assign("name1", ExprResult::Nil).is_err() {
+        if root.assign("name1", LoxType::Nil).is_err() {
             panic!("Should assign to known variable in nested scope.");
         }
 
-        let env2 = env3.drop();
-        let env1 = env2.drop();
+        root.drop();
+        root.drop();
 
-        if env1.get("name1").unwrap() != &ExprResult::Nil {
+        if root.get("name1").unwrap() != &LoxType::Nil {
             panic!("Did not overwrite variable in parent scope.");
+        }
+    }
+
+    #[test]
+    fn dont_drop_globals() {
+        // Ensure we can't accidentally drop the global environment
+
+        let mut global = Environment::default();
+        global.define("fun1", LoxType::Number(10.));
+
+        // Create a bunch of environment and then drop them
+        for _ in 1..10 {
+            global.new_scope();
+        }
+        for _ in 1..5 {
+            global.drop();
+        }
+        for _ in 1..10 {
+            global.new_scope();
+        }
+        for _ in 1..20 {
+            global.drop();
+        }
+
+        // Ensure final environment still contains our globals
+        match global.get("fun1") {
+            Ok(_) => (),
+            Err(_) => panic!("Dropped the global environment"),
         }
     }
 }

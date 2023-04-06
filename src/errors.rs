@@ -51,7 +51,9 @@ pub enum RuntimeError {
     Concatenation(String),
     Arithmetic(String),
     UndefinedVariable, // Null access error
+    UndefinedVariableAssignment,
     NotACallableType(String),
+    NotEnoughArguments,
 }
 
 #[derive(Debug, PartialEq)]
