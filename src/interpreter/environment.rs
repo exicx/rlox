@@ -15,7 +15,7 @@
 
 use std::collections::HashMap;
 
-use crate::errors::{RloxError, RuntimeError};
+use crate::errors::{Result, RloxError, RuntimeError};
 
 use super::ExprResult;
 
@@ -54,7 +54,7 @@ impl Environment {
 
     // Return value if it exists, otherwise error
     // Recurses up call stack
-    pub fn get(&self, name: &str) -> Result<&ExprResult, RloxError> {
+    pub fn get(&self, name: &str) -> Result<&ExprResult> {
         match self.values.get(name) {
             Some(res) => Ok(res),
             None => {
@@ -67,7 +67,7 @@ impl Environment {
         }
     }
 
-    pub fn assign(&mut self, name: &str, res: ExprResult) -> Result<(), RloxError> {
+    pub fn assign(&mut self, name: &str, res: ExprResult) -> Result<()> {
         match self.values.get(name) {
             Some(_) => {
                 // Variable is defined in this environment

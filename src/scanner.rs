@@ -16,11 +16,9 @@
 use std::collections::HashMap;
 use std::fmt::{self, Write};
 
-use crate::errors::{RloxError, ScanError};
+use crate::errors::{Result, RloxError, ScanError};
 use crate::parser::Parser;
 use crate::tokens::{Token, TokenType};
-
-type Result<T> = std::result::Result<T, RloxError>;
 
 // TODO: We're not really using errors very well.
 // Nevertheless, the scanner is 'complete'.

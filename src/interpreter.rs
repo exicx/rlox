@@ -17,12 +17,10 @@ mod environment;
 
 use std::fmt;
 
-use crate::errors::{RloxError, RuntimeError};
+use crate::errors::{Result, RloxError, RuntimeError};
 use crate::parser::ast::{Expr, ExprLiteral, Stmt};
 use crate::tokens::TokenType;
 use environment::Environment;
-
-type Result<T> = std::result::Result<T, RloxError>;
 
 // TODO: why am I doing this?
 #[derive(Debug, PartialEq, Clone)]
@@ -107,7 +105,6 @@ impl Interpreter {
                 let prev_env = env.drop();
                 self.env = Some(prev_env);
             }
-
             Stmt::If(condition, then_branch, else_branch) => {
                 if is_truthy(&self.evaluate(condition)?) {
                     self.execute(*then_branch)?;

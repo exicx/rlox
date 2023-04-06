@@ -16,6 +16,8 @@
 use std::error;
 use std::fmt;
 
+pub type Result<T> = std::result::Result<T, RloxError>;
+
 #[derive(Debug, PartialEq)]
 pub struct ScanError {
     line: usize,
@@ -39,6 +41,7 @@ impl ScanError {
 pub enum ParseError {
     ParseFailure(String),
     UnexpectedToken(String),
+    TooManyArguments,
     EOF,
 }
 
@@ -48,6 +51,7 @@ pub enum RuntimeError {
     Concatenation(String),
     Arithmetic(String),
     UndefinedVariable, // Null access error
+    NotACallableType(String),
 }
 
 #[derive(Debug, PartialEq)]

@@ -15,11 +15,9 @@
 
 pub mod ast;
 
-use crate::errors::{ParseError, RloxError};
+use crate::errors::{ParseError, Result, RloxError};
 use crate::tokens::{Token, TokenLiteral, TokenType};
 use ast::{Expr, ExprLiteral, Stmt};
-
-type Result<T> = std::result::Result<T, RloxError>;
 
 pub struct Parser {
     tokens: Vec<Token>,
