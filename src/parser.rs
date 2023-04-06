@@ -323,7 +323,21 @@ impl Parser {
             return Ok(Expr::Unary(operator, Box::new(rhs)));
         }
 
-        self.primary()
+        self.call()
+    }
+
+    fn call(&mut self) -> Result<Expr> {
+        let mut expr = self.primary()?;
+
+        loop {
+            if self.is_any_tokens(&[TokenType::LeftParen]) {
+                expr = self.finish_call(expr)?;
+            } else {
+                break;
+            }
+        }
+
+        Ok(expr)
     }
 
     fn primary(&mut self) -> Result<Expr> {
@@ -443,6 +457,33 @@ impl Parser {
             self.advance();
         }
     }
+
+    fn finish_call(&mut self, callee: Expr) -> Result<Expr> {
+        let mut arguments = vec![];
+
+        // Add zero or more arguments to vec
+        if !self.check(TokenType::RightParen) {
+            loop {
+                if arguments.len() >= 255 {
+                    return Err(RloxError::Parse(ParseError::TooManyArguments));
+                }
+                arguments.push(self.expression()?);
+
+                if !self.is_any_tokens(&[TokenType::Comma]) {
+                    break;
+                }
+            }
+        }
+
+        // Consume ending )
+        let paren = self.consume(TokenType::RightParen, "Expect ')' after arguments.")?;
+        Ok(Expr::Call(Box::new(callee), paren.clone(), arguments))
+    }
+}
+
+// Print the AST nodes
+pub fn print_ast() {
+    todo!()
 }
 
 #[cfg(test)]

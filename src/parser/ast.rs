@@ -15,7 +15,7 @@
 
 // TODO: Should TokenType be replaced with an AST-specific new type?
 // It's used for Binary operations: +, -, /, * and Unary: -, !.
-use crate::tokens::TokenType;
+use crate::tokens::{Token, TokenType};
 
 #[derive(Debug, Clone)]
 pub enum ExprLiteral {
@@ -29,6 +29,7 @@ pub enum ExprLiteral {
 pub enum Expr {
     Assign(String, Box<Expr>),                // a = 10;
     Binary(Box<Expr>, TokenType, Box<Expr>),  // a + a
+    Call(Box<Expr>, Token, Vec<Expr>),        // doSomething();
     Grouping(Box<Expr>),                      // (a)
     Literal(ExprLiteral),                     // 3.0, "", false
     Logical(Box<Expr>, TokenType, Box<Expr>), // false or "10"
