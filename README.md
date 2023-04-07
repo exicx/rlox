@@ -12,8 +12,10 @@ The project is based on the book "Crafting Interpreters", by Nystrom, Robert.
 ```ebnf
 program -> declaration* EOF ;
 
-declaration -> varDecl | statement ;
+declaration -> funDecl | varDecl | statement ;
 
+funDecl -> "fun" function ;
+function -> IDENTIFIER "(" parameters? ")" block ;
 varDecl -> "var" IDENTIFIER ( "=" expression )? ";" ;
 
 statement -> exprStmt | forStmt | ifStmt | printStmt | whileStmt | block ;
@@ -41,4 +43,5 @@ call -> primary ( "(" arguments? ")" )* ;
 primary -> NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" | IDENTIFIER ;
 
 arguments -> expression ( "," expression )* ;
+parameters -> IDENTIFIER ( "," IDENTIFIER )* ;
 ```
