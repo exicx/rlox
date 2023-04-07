@@ -49,6 +49,8 @@ impl Parser {
     fn declaration(&mut self) -> Result<Stmt> {
         if self.is_any_tokens(&[TokenType::Var]) {
             self.var_declaration()
+        } else if self.is_any_tokens(&[TokenType::Fun]) {
+            self.function("function")
         } else {
             self.statement()
         }
@@ -74,6 +76,61 @@ impl Parser {
         Ok(Stmt::Var(token, initializer))
     }
 
+    // Handle function declaration
+    fn function(&mut self, kind: &str) -> Result<Stmt> {
+        // function identifier
+        let name = self
+            .consume(TokenType::Identifier, &format!("Expect {} name.", kind))?
+            .clone();
+
+        // parameter
+        self.consume(
+            TokenType::LeftParen,
+            &format!("Expect '(' after {} name.", kind),
+        )?;
+
+        let mut params = vec![];
+
+        loop {
+            if self.check(TokenType::RightParen) {
+                // break when we find closing )
+                break;
+            }
+
+            if params.len() >= 255 {
+                // error if there's too many params
+                return Err(RloxError::Parse(ParseError::TooManyArguments));
+            }
+
+            // add param identifier to list
+            params.push(
+                self.consume(TokenType::Identifier, "Expect parameter name.")?
+                    .clone(),
+            );
+
+            if !self.is_any_tokens(&[TokenType::Comma]) {
+                // break if there's no more params
+                break;
+            }
+        }
+
+        // end of parameters
+        self.consume(
+            TokenType::RightParen,
+            &format!("Expect ')' after {} paramaters.", kind),
+        )?;
+
+        // Parse out function body in a block
+        self.consume(
+            TokenType::LeftBrace,
+            &format!("Expect '{{' before {} body.", kind),
+        )?;
+
+        let body = self.block_stmt()?;
+
+        Ok(Stmt::Fun(name.token_literal().to_string(), params, body))
+    }
+
     // Statement functions
 
     fn statement(&mut self) -> Result<Stmt> {
@@ -85,7 +142,7 @@ impl Parser {
             self.print_stmt()
         } else if self.is_any_tokens(&[TokenType::LeftBrace]) {
             // New block/scope
-            self.block_stmt()
+            Ok(Stmt::Block(self.block_stmt()?))
         } else if self.is_any_tokens(&[TokenType::While]) {
             // While loop
             self.while_stmt()
@@ -105,7 +162,7 @@ impl Parser {
         Ok(Stmt::Print(value))
     }
 
-    fn block_stmt(&mut self) -> Result<Stmt> {
+    fn block_stmt(&mut self) -> Result<Vec<Stmt>> {
         let mut stmts = vec![];
 
         while !self.check(TokenType::RightBrace) && !self.is_at_end() {
@@ -113,7 +170,7 @@ impl Parser {
         }
 
         self.consume(TokenType::RightBrace, "Expect '}' after block.")?;
-        Ok(Stmt::Block(stmts))
+        Ok(stmts)
     }
 
     fn if_stmt(&mut self) -> Result<Stmt> {
