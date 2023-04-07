@@ -18,11 +18,18 @@
 use crate::tokens::{Token, TokenType};
 
 #[derive(Debug, Clone)]
-pub enum ExprLiteral {
-    Bool(bool),
-    Number(f64),
-    String(String),
-    Nil,
+pub enum Stmt {
+    Block(Vec<Stmt>), // {}
+    Expression(Expr),     // all kinds of expressions
+    Fun(String, Vec<Token>, Vec<Stmt>),
+    If(
+        Expr,                  // condition
+        Box<Stmt>,         // statement
+        Option<Box<Stmt>>, // optional else statement
+    ), // if (true) print a;
+    Print(Expr),                // print "a";
+    Var(String, Option<Expr>),  // var declaration
+    While(Expr, Box<Stmt>), // while (true) { do_thing(); }
 }
 
 #[derive(Debug, Clone)]
@@ -38,15 +45,9 @@ pub enum Expr {
 }
 
 #[derive(Debug, Clone)]
-pub enum Stmt {
-    Block(Vec<Stmt>), // {}
-    Expression(Expr), // all kinds of expressions
-    If(
-        Expr,              // condition
-        Box<Stmt>,         // statement
-        Option<Box<Stmt>>, // optional else statement
-    ), // if (true) print a;
-    Print(Expr),      // print "a";
-    Var(String, Option<Expr>), // var declaration
-    While(Expr, Box<Stmt>), // while (true) { do_thing(); }
+pub enum ExprLiteral {
+    Bool(bool),
+    Number(f64),
+    String(String),
+    Nil,
 }
