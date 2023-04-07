@@ -53,7 +53,7 @@ pub enum RuntimeError {
     UndefinedVariable, // Null access error
     UndefinedVariableAssignment,
     NotACallableType(String),
-    NotEnoughArguments,
+    MismatchedArguments(String),
 }
 
 #[derive(Debug, PartialEq)]

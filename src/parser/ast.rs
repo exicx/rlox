@@ -20,16 +20,20 @@ use crate::tokens::{Token, TokenType};
 #[derive(Debug, Clone)]
 pub enum Stmt {
     Block(Vec<Stmt>), // {}
-    Expression(Expr),     // all kinds of expressions
-    Fun(String, Vec<Token>, Vec<Stmt>),
+    Expression(Expr), // all kinds of expressions
+    Fun(
+        String,     // fun name
+        Vec<Token>, // fun params
+        Vec<Stmt>,  // fun body
+    ),
     If(
-        Expr,                  // condition
+        Expr,              // condition
         Box<Stmt>,         // statement
         Option<Box<Stmt>>, // optional else statement
-    ), // if (true) print a;
-    Print(Expr),                // print "a";
-    Var(String, Option<Expr>),  // var declaration
-    While(Expr, Box<Stmt>), // while (true) { do_thing(); }
+    ),
+    Print(Expr),               // print "a";
+    Var(String, Option<Expr>), // var declaration
+    While(Expr, Box<Stmt>),    // while (true) { do_thing(); }
 }
 
 #[derive(Debug, Clone)]
