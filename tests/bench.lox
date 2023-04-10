@@ -1,17 +1,36 @@
-print "starting bench";
+var start;
 
-for (var i = 0; i < 1000; i = i + 1) {
-  for (var j = 0; j < 1000; j = j + 1) {
+fun start_bench() {
+  print "Starting benchmark.";
+  start = clock();
+}
 
-    var a = 0;
-    var temp;
+fun end_bench() {
+  print "Ending benchmark.";
+  var result = clock() - start;
+  print result;
+  print "seconds";
+}
 
-    for (var b = 1; a < 10000000; b = temp + b) {
-      temp = a;
-      a = b;
-    }
+fun fib(limit) {
+  var a = 0;
+  var temp;
 
+  for (var b = 1; a < limit; b = temp + b) {
+    temp = a;
+    a = b;
   }
 }
 
-print "ending bench";
+fun bench() {
+  start_bench();
+  for (var i = 0; i < 1000; i = i + 1) {
+    for (var j = 0; j < 1000; j = j + 1) {
+      fib(10000);
+    }
+  }
+  end_bench();
+}
+
+bench();
+
