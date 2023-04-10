@@ -13,49 +13,110 @@
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
 
+use std::fmt::{Debug, Display};
+use std::time::SystemTime;
+
 use super::{Interpreter, LoxType};
-use crate::errors::{Result, RloxError, RuntimeError};
+use crate::errors::Result;
+use crate::parser::ast::Stmt;
+use crate::tokens::Token;
 
 // Callable trait defines an interface for functions, lambdas and classes
-pub(super) trait Callable {
-    fn arity(&self) -> u16;
+pub(super) trait Callable: Debug + Display {
+    fn arity(&self) -> u8;
     fn call(&self, interpreter: &mut Interpreter, arguments: &[LoxType]) -> Result<LoxType>;
 }
 
-pub(super) struct Function {
+// A user-defined function.
+#[derive(Debug, Clone)]
+pub(super) struct LoxFunction {
     name: String,
-    arity: u16,
+    params: Vec<Token>,
+    body: Vec<Stmt>,
 }
 
-impl Function {
-    fn new(name: String, arity: u16) -> Self {
-        Self { name, arity }
+impl Display for LoxFunction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<fn {}#{}()>", self.name, self.params.len())
     }
 }
 
-impl Callable for Function {
-    fn arity(&self) -> u16 {
-        self.arity
+impl LoxFunction {
+    pub fn new(name: &str, params: Vec<Token>, body: Vec<Stmt>) -> Self {
+        Self {
+            name: name.to_string(),
+            params,
+            body,
+        }
+    }
+}
+
+impl Callable for LoxFunction {
+    fn arity(&self) -> u8 {
+        self.params.len() as u8
     }
     fn call(&self, interpreter: &mut Interpreter, arguments: &[LoxType]) -> Result<LoxType> {
-        eprintln!("Executed function: {}", self.name);
+        // Create an environment, branched from the global environment
+        // In that environment, bind the arguments to the parameters from
+        // the function declaration.
+
+        assert_eq!(self.params.len(), arguments.len());
+
+        // This is the worst thing I've ever done
+        let mut env = interpreter.env.clone();
+        while env.drop() {}
+        env.new_scope();
+
+        let items = self.params.iter().zip(arguments.iter());
+
+        for (token, loxtype) in items {
+            env.define(token.lexeme(), loxtype.clone());
+        }
+
+        interpreter.execute_block(self.body.clone(), env);
 
         Ok(LoxType::Nil)
     }
 }
 
-impl TryFrom<LoxType> for Function {
-    type Error = RloxError;
-    fn try_from(value: LoxType) -> std::result::Result<Self, Self::Error> {
-        match value {
-            // TODO: change this from String to Function type once implemented.
-            LoxType::String(fun) => Ok(Function::new(fun, 0)),
-            // LoxType::Function() => {},
-            // LoxType::Class() => {},
-            _ => Err(RloxError::Interpret(RuntimeError::NotACallableType(
-                "Can only call functions and classes.".to_string(),
-            ))),
-        }
+#[derive(Debug, Clone)]
+pub(super) struct FfiClock;
+
+impl Display for FfiClock {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<native fn>")
+    }
+}
+
+impl Callable for FfiClock {
+    fn arity(&self) -> u8 {
+        0
+    }
+    fn call(&self, _: &mut super::Interpreter, _: &[LoxType]) -> Result<LoxType> {
+        Ok(LoxType::Number(
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_secs() as f64,
+        ))
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(super) struct FfiPrint;
+impl Display for FfiPrint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<native fn>")
+    }
+}
+
+impl Callable for FfiPrint {
+    fn arity(&self) -> u8 {
+        1
+    }
+    fn call(&self, interpreter: &mut Interpreter, arguments: &[LoxType]) -> Result<LoxType> {
+        println!("{}", arguments[0]);
+        Ok(LoxType::Nil)
     }
 }
 

@@ -21,16 +21,22 @@ use std::fmt;
 use crate::errors::{Result, RloxError, RuntimeError};
 use crate::parser::ast::{Expr, ExprLiteral, Stmt};
 use crate::tokens::TokenType;
-use callable::{Callable, Function};
+use callable::{Callable, FfiClock, FfiPrint, LoxFunction};
 use environment::Environment;
 
-// TODO: why am I doing this?
-#[derive(Debug, PartialEq, Clone)]
+// TODO: getting rid of Clone here would allow using trait objects
+// as the type for Functions, Classes, and Native FFI
+#[derive(Debug, Clone)]
 enum LoxType {
     Bool(bool),
     Number(f64),
     String(String),
-    // Function(String, u16),
+    Fun(LoxFunction),
+    Clock(FfiClock), // Make this more generic so we can define more native FFI
+    Print(FfiPrint),
+    // Fun(Box<dyn Callable>),
+    // Class(Box<dyn Callable>),
+    // Ffi(Box<dyn Callable>),
     Nil,
 }
 
@@ -47,6 +53,10 @@ impl fmt::Display for LoxType {
             LoxType::Nil => write!(f, "nil"),
             LoxType::Number(n) => write!(f, "{}", n),
             LoxType::String(s) => write!(f, "{s}"),
+            LoxType::Fun(call) => write!(f, "{call}"),
+            LoxType::Clock(call) => write!(f, "{call}"),
+            LoxType::Print(call) => write!(f, "{call}"),
+            // LoxType::Class(call) => write!(f, "{call}"),
         }
     }
 }
@@ -57,12 +67,9 @@ pub struct Interpreter {
 
 impl Default for Interpreter {
     fn default() -> Self {
-        let env = Environment::default();
-
-        // for native in Natives::default() {
-        //     self.env.define(native);
-        // }
-
+        let mut env = Environment::new();
+        env.define("clock", LoxType::Clock(FfiClock {}));
+        env.define("print", LoxType::Print(FfiPrint {}));
         Self { env }
     }
 }
@@ -121,16 +128,22 @@ impl Interpreter {
                     self.execute(*stmt.clone())?;
                 }
             }
+            Stmt::Fun(name, params, body) => {
+                let fun = LoxFunction::new(&name, params, body);
+                self.env.define(&name, LoxType::Fun(fun));
+            }
         }
 
         Ok(())
     }
 
+    fn execute_block(&mut self, body: Vec<Stmt>, environment: Environment) {
+        // This function is just like execute(), but it's specific to trait Callable
+    }
+
     fn evaluate(&mut self, expr: Expr) -> Result<LoxType> {
         match expr {
             // Evaluate literals
-            // ? TODO
-            // Why am I converting from an ExprLiteral to an LoxType
             Expr::Literal(lit) => match lit {
                 ExprLiteral::Bool(v) => Ok(LoxType::Bool(v)),
                 ExprLiteral::Nil => Ok(LoxType::Nil),
@@ -174,23 +187,36 @@ impl Interpreter {
                 Ok(self.evaluate(*right)?)
             }
             // TODO: Use token to improve interpreter error messages.
-            Expr::Call(callee, _token, arguments) => {
+            Expr::Call(callee, token, arguments) => {
                 let callee = self.evaluate(*callee)?;
+                let call: Box<dyn Callable> = match callee {
+                    LoxType::Fun(callee) => Box::new(callee),
+                    LoxType::Clock(callee) => Box::new(callee),
+                    other => {
+                        return Err(RloxError::Interpret(RuntimeError::NotACallableType(
+                            other.to_string(),
+                        )));
+                    }
+                };
 
+                // Evaluate arguments of function call
                 let mut args = vec![];
                 for argument in arguments {
                     args.push(self.evaluate(argument)?);
                 }
 
-                // Convert callee into a function
-                let fun: Function = Function::try_from(callee)?;
-
                 // Make sure we have the correct number of arguments,
                 // Then call the function
-                if fun.arity() as usize != args.len() {
-                    Err(RloxError::Interpret(RuntimeError::NotEnoughArguments))
+                if call.arity() as usize != args.len() {
+                    Err(RloxError::Interpret(RuntimeError::MismatchedArguments(
+                        format!(
+                            "Expected {} arguments, but got {}.",
+                            call.arity(),
+                            args.len()
+                        ),
+                    )))
                 } else {
-                    Ok(fun.call(self, &args)?)
+                    Ok(call.call(self, &args)?)
                 }
             }
         }
@@ -339,7 +365,19 @@ fn is_truthy(expr: &LoxType) -> bool {
 }
 
 fn is_equal(left: &LoxType, right: &LoxType) -> bool {
-    *left == *right
+    if let (LoxType::Bool(v1), LoxType::Bool(v2)) = (left, right) {
+        v1 == v2
+    } else if let (LoxType::Nil, LoxType::Nil) = (left, right) {
+        true
+    } else if let (LoxType::Number(n1), LoxType::Number(n2)) = (left, right) {
+        n1 == n2
+    } else if let (LoxType::String(s1), LoxType::String(s2)) = (left, right) {
+        s1 == s2
+    } else {
+        false
+    }
+
+    // TODO figure out how to compare Fun and Class types
 }
 
 #[cfg(test)]

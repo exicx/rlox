@@ -19,27 +19,72 @@ use crate::errors::{Result, RloxError, RuntimeError};
 
 use super::LoxType;
 
-#[derive(Debug, Default)]
+/*
+ * We need to keep a linked list of Environments, where later entires
+ * are more local environments.
+ * Each Environment contains the named declarations of a scope.
+ * Global scope is the parent Environment of every chain.
+ * When functions are executed, they need a new environment that only
+ * has the global scope as a parent.
+ *
+ * So we'll have at least two things pointing to the global scope, each needing
+ * an exclusive reference (&mut). For this we'll have to use Rc.
+ *
+ * From:
+ *
+ * struct Interpreter {
+ *   env: Environment,
+ * }
+ *
+ * struct Environment {
+ *   scopes: Vec<Scope>,
+ * }
+ *
+ * To:
+ *
+ * struct Interpreter {
+ *   env: Environment,
+ * }
+ *
+ * struct Environment {
+ *   parent: Option<Box<Environment>>,
+ *   values: HashMap<String, LoxType>,
+ * }
+ */
+
+#[derive(Debug, Clone)]
 struct Scope {
     values: HashMap<String, LoxType>,
 }
 
-#[derive(Debug)]
+impl Default for Scope {
+    fn default() -> Self {
+        let mut values = HashMap::new();
+        values.reserve(4);
+        Self { values }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub(super) struct Environment {
     scopes: Vec<Scope>,
 }
 
 impl Default for Environment {
     fn default() -> Self {
-        let mut scopes = Vec::new();
-        scopes.reserve(8);
-        scopes.push(Scope::default());
-
-        Self { scopes }
+        Self {
+            scopes: vec![Scope::default()],
+        }
     }
 }
 
 impl Environment {
+    pub fn new() -> Self {
+        Self {
+            ..Default::default()
+        }
+    }
+
     // Create a new scope at the end of the queue
     pub fn new_scope(&mut self) {
         self.scopes.push(Scope::default());
@@ -48,9 +93,13 @@ impl Environment {
     // Drop the top-most scope
     // self.scopes[0] is the global scope, don't allow dropping
     // that one.
-    pub fn drop(&mut self) {
+    pub fn drop(&mut self) -> bool {
         if self.scopes.len() > 1 {
             self.scopes.pop();
+            true
+        } else {
+            // return false when all scopes are dropped (except for global)
+            false
         }
     }
 
@@ -99,18 +148,6 @@ impl Environment {
 
         Ok(())
     }
-
-    // Return a mutable reference to the global environment
-    pub fn define_globals(&mut self, name: &str, res: LoxType) {
-        self.scopes[0].values.insert(name.to_string(), res);
-    }
-
-    pub fn get_globals(&mut self, name: &str) -> Result<&LoxType> {
-        match self.scopes[0].values.get(name) {
-            Some(expr) => Ok(expr),
-            None => Err(RloxError::Interpret(RuntimeError::UndefinedVariable)),
-        }
-    }
 }
 
 #[cfg(test)]
@@ -124,8 +161,15 @@ mod tests {
         env.define("var1", LoxType::Bool(true));
         env.define("var2", LoxType::Nil);
 
-        assert_eq!(env.get("var2"), Ok(&LoxType::Nil));
-        assert_eq!(env.get("var1"), Ok(&LoxType::Bool(true)));
+        if let Ok(&LoxType::Nil) = env.get("var2") {
+        } else {
+            panic!("Mismatched types.");
+        }
+
+        if let Ok(&LoxType::Bool(true)) = env.get("var1") {
+        } else {
+            panic!("Mismatched types.");
+        }
     }
 
     #[test]
@@ -198,7 +242,8 @@ mod tests {
         root.drop();
         root.drop();
 
-        if root.get("name1").unwrap() != &LoxType::Nil {
+        if let Ok(&LoxType::Nil) = root.get("name1") {
+        } else {
             panic!("Did not overwrite variable in parent scope.");
         }
     }
