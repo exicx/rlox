@@ -60,9 +60,9 @@ fn run(interpreter: &mut Interpreter, input: &str) -> Result<(), RloxError> {
     }
     let has_error = program.iter().any(|i| i.is_err());
     if has_error {
-        return Err(RloxError::Parse(ParseError::ParseFailure(String::from(
-            "Exiting.",
-        ))));
+        return Err(RloxError::Parse(ParseError::ParseFailure(
+            "Exiting.".to_string(),
+        )));
     }
 
     // Collect just the successful parses.
