@@ -125,6 +125,10 @@ impl Token {
     pub fn token_literal(&self) -> &TokenLiteral {
         &self.literal
     }
+
+    pub fn lexeme(&self) -> &str {
+        &self.lexeme
+    }
 }
 
 impl Display for Token {
