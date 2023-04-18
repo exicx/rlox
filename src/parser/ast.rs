@@ -31,9 +31,10 @@ pub enum Stmt {
         Box<Stmt>,         // statement
         Option<Box<Stmt>>, // optional else statement
     ),
-    Print(Expr),               // print "a";
-    Var(String, Option<Expr>), // var declaration
-    While(Expr, Box<Stmt>),    // while (true) { do_thing(); }
+    Print(Expr),                 // print "a";
+    Return(Token, Option<Expr>), // return a;
+    Var(String, Option<Expr>),   // var declaration
+    While(Expr, Box<Stmt>),      // while (true) { do_thing(); }
 }
 
 #[derive(Debug, Clone)]

@@ -149,6 +149,8 @@ impl Parser {
         } else if self.is_any_tokens(&[TokenType::For]) {
             // For loop
             self.for_stmt()
+        } else if self.is_any_tokens(&[TokenType::Return]) {
+            self.return_stmt()
         } else {
             // We're an expression
             self.expression_stmt()
@@ -258,6 +260,18 @@ impl Parser {
         }
 
         Ok(body)
+    }
+
+    fn return_stmt(&mut self) -> Result<Stmt> {
+        let keyword = self.previous().clone();
+        let expr = if !self.check(TokenType::Semicolon) {
+            Some(self.expression()?)
+        } else {
+            None
+        };
+
+        self.consume(TokenType::Semicolon, "Expect ';' after return value.")?;
+        Ok(Stmt::Return(keyword, expr))
     }
 
     // Evaluate the expression and return Stmt::Expression(result)
