@@ -55,6 +55,7 @@ impl Callable for LoxFunction {
     fn arity(&self) -> u8 {
         self.params.len() as u8
     }
+
     fn call(&self, interpreter: &mut Interpreter, arguments: &[LoxType]) -> Result<LoxType> {
         // Create an environment, branched from the global environment
         // In that environment, bind the arguments to the parameters from
@@ -73,9 +74,11 @@ impl Callable for LoxFunction {
             env.define(token.lexeme(), loxtype.clone());
         }
 
-        interpreter.execute_block(self.body.clone(), env);
-
-        Ok(LoxType::Nil)
+        // Handle Return values, if there's no Return then return Nil.
+        match interpreter.execute_block(self.body.clone(), env)? {
+            Some(ret) => Ok(ret.0),
+            None => Ok(LoxType::Nil),
+        }
     }
 }
 

@@ -24,6 +24,8 @@ use crate::tokens::TokenType;
 use callable::{Callable, FfiClock, FfiPrint, LoxFunction};
 use environment::Environment;
 
+struct Return(LoxType);
+
 // TODO: getting rid of Clone here would allow using trait objects
 // as the type for Functions, Classes, and Native FFI
 #[derive(Debug, Clone)]
@@ -82,12 +84,14 @@ impl Interpreter {
     pub fn interpret(&mut self, program: Vec<Stmt>) -> Result<()> {
         for statement in program {
             self.execute(statement)?;
+            // we don't need the Return() type here, only inside
+            // functions/closures/methods
         }
 
         Ok(())
     }
 
-    fn execute(&mut self, stmt: Stmt) -> Result<()> {
+    fn execute(&mut self, stmt: Stmt) -> Result<Option<Return>> {
         match stmt {
             Stmt::Expression(expr) => {
                 self.evaluate(expr)?;
@@ -132,13 +136,38 @@ impl Interpreter {
                 let fun = LoxFunction::new(&name, params, body);
                 self.env.define(&name, LoxType::Fun(fun));
             }
+            Stmt::Return(_tok, expr) => {
+                let val = match expr {
+                    Some(expr) => self.evaluate(expr)?,
+                    None => LoxType::Nil,
+                };
+
+                return Ok(Some(Return(val)));
+            }
         }
 
-        Ok(())
+        Ok(None)
     }
 
-    fn execute_block(&mut self, body: Vec<Stmt>, environment: Environment) {
+    fn execute_block(
+        &mut self,
+        body: Vec<Stmt>,
+        environment: Environment,
+    ) -> Result<Option<Return>> {
         // This function is just like execute(), but it's specific to trait Callable
+        // We give it its own environment to handle 1) functions, 2) closures.
+
+        // TODO: Handle environment.
+
+        for statement in body {
+            if let Some(ret) = self.execute(statement)? {
+                // If we get a Return() struct, immediately stop execution and
+                // return value to caller.
+                return Ok(Some(ret));
+            }
+        }
+
+        Ok(None)
     }
 
     fn evaluate(&mut self, expr: Expr) -> Result<LoxType> {
