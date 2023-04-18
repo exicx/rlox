@@ -18,7 +18,13 @@ funDecl -> "fun" function ;
 function -> IDENTIFIER "(" parameters? ")" block ;
 varDecl -> "var" IDENTIFIER ( "=" expression )? ";" ;
 
-statement -> exprStmt | forStmt | ifStmt | printStmt | whileStmt | block ;
+statement -> exprStmt
+    | forStmt
+    | ifStmt
+    | printStmt
+    | returnStmt
+    | whileStmt
+    | block ;
 
 exprStmt -> expression ";" ;
 forStmt -> "for" "("
@@ -27,6 +33,7 @@ forStmt -> "for" "("
            expression? ")" statement ;
 ifStmt -> "if" "(" expression ")" statement ( "else" statement )? ;
 printStmt -> "print" expression ";" ;
+returnStmt -> "return" expression? ";" ;
 whileStmt -> "while" "(" expression ")" statement ;
 block -> "{" declaration* "}" ;
 
