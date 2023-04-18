@@ -136,6 +136,7 @@ impl Interpreter {
                 let fun = LoxFunction::new(&name, params, body);
                 self.env.define(&name, LoxType::Fun(fun));
             }
+            // TODO: Use token to improve interpreter error messages.
             Stmt::Return(_tok, expr) => {
                 let val = match expr {
                     Some(expr) => self.evaluate(expr)?,
@@ -216,7 +217,7 @@ impl Interpreter {
                 Ok(self.evaluate(*right)?)
             }
             // TODO: Use token to improve interpreter error messages.
-            Expr::Call(callee, token, arguments) => {
+            Expr::Call(callee, _tok, arguments) => {
                 let callee = self.evaluate(*callee)?;
                 let call: Box<dyn Callable> = match callee {
                     LoxType::Fun(callee) => Box::new(callee),

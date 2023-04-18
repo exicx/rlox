@@ -57,16 +57,20 @@ impl Callable for LoxFunction {
     }
 
     fn call(&self, interpreter: &mut Interpreter, arguments: &[LoxType]) -> Result<LoxType> {
+        assert_eq!(self.params.len(), arguments.len());
+
         // Create an environment, branched from the global environment
         // In that environment, bind the arguments to the parameters from
         // the function declaration.
 
-        assert_eq!(self.params.len(), arguments.len());
-
         // This is the worst thing I've ever done
+        // TODO: This doesn't even work.
         let mut env = interpreter.env.clone();
         while env.drop() {}
         env.new_scope();
+
+        // Zip up arguments and their results
+        // Bind each value to its name in the new environment
 
         let items = self.params.iter().zip(arguments.iter());
 
@@ -74,7 +78,7 @@ impl Callable for LoxFunction {
             env.define(token.lexeme(), loxtype.clone());
         }
 
-        // Handle Return values, if there's no Return then return Nil.
+        // Execute function and return its (optional) return value
         match interpreter.execute_block(self.body.clone(), env)? {
             Some(ret) => Ok(ret.0),
             None => Ok(LoxType::Nil),
@@ -95,7 +99,7 @@ impl Callable for FfiClock {
     fn arity(&self) -> u8 {
         0
     }
-    fn call(&self, _: &mut super::Interpreter, _: &[LoxType]) -> Result<LoxType> {
+    fn call(&self, _: &mut Interpreter, _: &[LoxType]) -> Result<LoxType> {
         Ok(LoxType::Number(
             SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
@@ -117,7 +121,7 @@ impl Callable for FfiPrint {
     fn arity(&self) -> u8 {
         1
     }
-    fn call(&self, interpreter: &mut Interpreter, arguments: &[LoxType]) -> Result<LoxType> {
+    fn call(&self, _: &mut Interpreter, arguments: &[LoxType]) -> Result<LoxType> {
         println!("{}", arguments[0]);
         Ok(LoxType::Nil)
     }
