@@ -16,7 +16,7 @@
 pub mod ast;
 
 use crate::errors::{ParseError, Result, RloxError};
-use crate::tokens::{Token, TokenLiteral, TokenType};
+use crate::scanner::{Token, TokenLiteral, TokenType};
 use ast::{Expr, ExprLiteral, Stmt};
 
 pub struct Parser {
@@ -290,6 +290,7 @@ impl Parser {
         self.assignment()
     }
 
+    // a = "10";
     fn assignment(&mut self) -> Result<Expr> {
         let expr = self.or()?;
 
@@ -308,6 +309,7 @@ impl Parser {
         Ok(expr)
     }
 
+    // a or b
     fn or(&mut self) -> Result<Expr> {
         let mut expr = self.and()?;
 
@@ -320,6 +322,7 @@ impl Parser {
         Ok(expr)
     }
 
+    // a and b
     fn and(&mut self) -> Result<Expr> {
         let mut expr = self.equality()?;
 
@@ -332,6 +335,7 @@ impl Parser {
         Ok(expr)
     }
 
+    // a == b, true != false
     fn equality(&mut self) -> Result<Expr> {
         let mut expr = self.comparison()?;
 
@@ -346,6 +350,7 @@ impl Parser {
         Ok(expr)
     }
 
+    // a > b
     fn comparison(&mut self) -> Result<Expr> {
         let mut expr = self.term()?;
 
@@ -363,6 +368,7 @@ impl Parser {
         Ok(expr)
     }
 
+    // a + b, a - b
     fn term(&mut self) -> Result<Expr> {
         let mut expr = self.factor()?;
 
@@ -375,6 +381,7 @@ impl Parser {
         Ok(expr)
     }
 
+    // a * b, a / b
     fn factor(&mut self) -> Result<Expr> {
         let mut expr = self.unary()?;
 
@@ -387,6 +394,7 @@ impl Parser {
         Ok(expr)
     }
 
+    // !b, -a
     fn unary(&mut self) -> Result<Expr> {
         if self.is_any_tokens(&[TokenType::Minus, TokenType::Bang]) {
             let operator = self.previous().token_type();
@@ -397,6 +405,7 @@ impl Parser {
         self.call()
     }
 
+    // do_something()
     fn call(&mut self) -> Result<Expr> {
         let mut expr = self.primary()?;
 
@@ -411,6 +420,7 @@ impl Parser {
         Ok(expr)
     }
 
+    // false, true, nil, groupings, identifiers, strings, numbers
     fn primary(&mut self) -> Result<Expr> {
         if self.is_any_tokens(&[TokenType::False]) {
             return Ok(Expr::Literal(ExprLiteral::Bool(false)));
@@ -462,6 +472,7 @@ impl Parser {
 
     // Helper functions
 
+    // returns true if the next token is any of the ones we're searching for
     fn is_any_tokens(&mut self, tokens: &[TokenType]) -> bool {
         for token in tokens {
             if self.check(*token) {
@@ -472,6 +483,7 @@ impl Parser {
         false
     }
 
+    // advances to the next token and returns a ref to it
     fn advance(&mut self) -> &Token {
         if !self.is_at_end() {
             self.current += 1;
@@ -479,6 +491,8 @@ impl Parser {
         self.previous()
     }
 
+    // checks the next token is the kind we're looking for, and advances if so.
+    // otherwise, return the given error message in an UnexpectedToken type
     fn consume(&mut self, token_type: TokenType, msg: &str) -> Result<&Token> {
         if self.check(token_type) {
             return Ok(self.advance());
@@ -505,6 +519,8 @@ impl Parser {
         self.tokens.get(self.current - 1).unwrap()
     }
 
+    // skips past a syntacically invalid statement and finds the beginning
+    // of the next one based on a few tokens: class, fun, var, for, ...
     fn synchronize(&mut self) {
         self.advance();
         while !self.is_at_end() {
@@ -529,6 +545,8 @@ impl Parser {
         }
     }
 
+    // the second half of the call() function
+    // parses the arguments and consumes the ending ')'.
     fn finish_call(&mut self, callee: Expr) -> Result<Expr> {
         let mut arguments = vec![];
 
@@ -546,7 +564,7 @@ impl Parser {
             }
         }
 
-        // Consume ending )
+        // Consume ending ')'
         let paren = self.consume(TokenType::RightParen, "Expect ')' after arguments.")?;
         Ok(Expr::Call(Box::new(callee), paren.clone(), arguments))
     }
@@ -560,7 +578,7 @@ pub fn print_ast() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tokens::*;
+    use crate::scanner::TokenType;
 
     fn get_scanner(opt: Option<&str>) -> crate::scanner::Scanner {
         let mut s = match opt {

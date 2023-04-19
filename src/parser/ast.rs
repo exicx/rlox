@@ -15,7 +15,7 @@
 
 // TODO: Should TokenType be replaced with an AST-specific new type?
 // It's used for Binary operations: +, -, /, * and Unary: -, !.
-use crate::tokens::{Token, TokenType};
+use crate::scanner::{Token, TokenType};
 
 #[derive(Debug, Clone)]
 pub enum Stmt {

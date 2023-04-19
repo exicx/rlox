@@ -15,53 +15,16 @@
 
 mod callable; // Traits for callable objects (functions, classes, lambdas)
 mod environment; // Call stack
-
-use std::fmt;
+mod loxreturn;
+mod loxtype;
 
 use crate::errors::{Result, RloxError, RuntimeError};
 use crate::parser::ast::{Expr, ExprLiteral, Stmt};
-use crate::tokens::TokenType;
+use crate::scanner::TokenType;
 use callable::{Callable, FfiClock, FfiPrint, LoxFunction};
 use environment::Environment;
-
-struct Return(LoxType);
-
-// TODO: getting rid of Clone here would allow using trait objects
-// as the type for Functions, Classes, and Native FFI
-#[derive(Debug, Clone)]
-enum LoxType {
-    Bool(bool),
-    Number(f64),
-    String(String),
-    Fun(LoxFunction),
-    Clock(FfiClock), // Make this more generic so we can define more native FFI
-    Print(FfiPrint),
-    // Fun(Box<dyn Callable>),
-    // Class(Box<dyn Callable>),
-    // Ffi(Box<dyn Callable>),
-    Nil,
-}
-
-impl fmt::Display for LoxType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            LoxType::Bool(v) => {
-                if *v {
-                    write!(f, "true")
-                } else {
-                    write!(f, "false")
-                }
-            }
-            LoxType::Nil => write!(f, "nil"),
-            LoxType::Number(n) => write!(f, "{}", n),
-            LoxType::String(s) => write!(f, "{s}"),
-            LoxType::Fun(call) => write!(f, "{call}"),
-            LoxType::Clock(call) => write!(f, "{call}"),
-            LoxType::Print(call) => write!(f, "{call}"),
-            // LoxType::Class(call) => write!(f, "{call}"),
-        }
-    }
-}
+use loxreturn::Return;
+use loxtype::LoxType;
 
 pub struct Interpreter {
     env: Environment,
@@ -80,6 +43,10 @@ impl Interpreter {
     pub fn new() -> Self {
         Default::default()
     }
+
+    //
+    // Handling programs and statements
+    //
 
     pub fn interpret(&mut self, program: Vec<Stmt>) -> Result<()> {
         for statement in program {
@@ -157,6 +124,7 @@ impl Interpreter {
     ) -> Result<Option<Return>> {
         // This function is just like execute(), but it's specific to trait Callable
         // We give it its own environment to handle 1) functions, 2) closures.
+        // We also deal with return values that execute() ignores.
 
         // TODO: Handle environment.
 
@@ -170,6 +138,10 @@ impl Interpreter {
 
         Ok(None)
     }
+
+    //
+    // Handling Expressions
+    //
 
     fn evaluate(&mut self, expr: Expr) -> Result<LoxType> {
         match expr {

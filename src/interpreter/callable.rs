@@ -16,21 +16,22 @@
 use std::fmt::{Debug, Display};
 use std::time::SystemTime;
 
-use super::{Interpreter, LoxType};
+use super::{environment::Environment, Interpreter, LoxType};
 use crate::errors::Result;
 use crate::parser::ast::Stmt;
-use crate::tokens::Token;
+use crate::scanner::Token;
 
 // Callable trait defines an interface for functions, lambdas and classes
-pub(super) trait Callable: Debug + Display {
+pub trait Callable: Debug + Display {
     fn arity(&self) -> u8;
     fn call(&self, interpreter: &mut Interpreter, arguments: &[LoxType]) -> Result<LoxType>;
 }
 
 // A user-defined function.
 #[derive(Debug, Clone)]
-pub(super) struct LoxFunction {
+pub struct LoxFunction {
     name: String,
+    closure: Environment,
     params: Vec<Token>,
     body: Vec<Stmt>,
 }
@@ -44,6 +45,7 @@ impl Display for LoxFunction {
 impl LoxFunction {
     pub fn new(name: &str, params: Vec<Token>, body: Vec<Stmt>) -> Self {
         Self {
+            closure: Environment::new(),
             name: name.to_string(),
             params,
             body,
@@ -87,7 +89,7 @@ impl Callable for LoxFunction {
 }
 
 #[derive(Debug, Clone)]
-pub(super) struct FfiClock;
+pub struct FfiClock;
 
 impl Display for FfiClock {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -110,7 +112,7 @@ impl Callable for FfiClock {
 }
 
 #[derive(Debug, Clone)]
-pub(super) struct FfiPrint;
+pub struct FfiPrint;
 impl Display for FfiPrint {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "<native fn>")
