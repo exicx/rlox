@@ -13,15 +13,15 @@
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
 
+mod tokens;
+
 use std::collections::HashMap;
 use std::fmt::{self, Write};
 
 use crate::errors::{Result, RloxError, ScanError};
 use crate::parser::Parser;
-use crate::tokens::{Token, TokenType};
+pub use tokens::{Token, TokenLiteral, TokenType};
 
-// TODO: We're not really using errors very well.
-// Nevertheless, the scanner is 'complete'.
 pub struct Scanner {
     source: Vec<char>,
     tokens: Vec<Token>,
@@ -44,6 +44,7 @@ impl Default for Scanner {
         keywords.insert("if".into(), TokenType::If);
         keywords.insert("nil".into(), TokenType::Nil);
         keywords.insert("or".into(), TokenType::Or);
+        // we can remove this if we break compatibility with Lox
         keywords.insert("print".into(), TokenType::Print);
         keywords.insert("return".into(), TokenType::Return);
         keywords.insert("super".into(), TokenType::Super);
@@ -335,7 +336,7 @@ impl Scanner {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tokens::*;
+    use tokens::*;
 
     fn setup_scanner1() -> Scanner {
         let mut scanner = Scanner::new(
