@@ -91,8 +91,7 @@ pub struct Token {
 }
 
 impl Token {
-    pub fn new(token_type: TokenType, lexeme: &[char], line: usize, position: usize) -> Token {
-        let lexeme: String = lexeme.iter().collect();
+    pub fn new(token_type: TokenType, lexeme: String, line: usize, position: usize) -> Token {
         let tl = match token_type {
             TokenType::String => {
                 let string_literal = lexeme.trim_matches('"').into();
@@ -109,6 +108,7 @@ impl Token {
             }
             _ => TokenLiteral::None,
         };
+
         Token {
             token_type,
             lexeme,

@@ -45,8 +45,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 // Scans, Parses, and evaluates input.
 fn run(interpreter: &mut Interpreter, input: &str) -> Result<(), RloxError> {
     // TODO: Clean this up.
-    let mut scanner = Scanner::new(input);
-    scanner.scan_tokens()?;
+    let mut scanner = Scanner::new();
+    scanner.scan_tokens(input)?;
 
     // Parse the input and evaluate expressions
     let program = scanner.into_parser().parse();

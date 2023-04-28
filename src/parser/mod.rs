@@ -581,12 +581,14 @@ mod tests {
     use crate::scanner::TokenType;
 
     fn get_scanner(opt: Option<&str>) -> crate::scanner::Scanner {
-        let mut s = match opt {
-            Some(x) => crate::scanner::Scanner::new(x),
-            None => crate::scanner::Scanner::new("10 == 20;"),
+        let mut scanner = crate::scanner::Scanner::new();
+
+        match opt {
+            Some(x) => scanner.scan_tokens(x).unwrap(),
+            None => scanner.scan_tokens("10 == 20;").unwrap(),
         };
-        s.scan_tokens().unwrap();
-        s
+
+        scanner
     }
 
     fn get_parser_scanner(opt: Option<&str>) -> Parser {

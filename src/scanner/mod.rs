@@ -13,27 +13,45 @@
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
 
+mod input;
 mod tokens;
 
 use std::collections::HashMap;
-use std::fmt::{self, Write};
+use std::fmt::{self, Debug, Write};
+use std::str::FromStr;
 
+use self::input::{Input, InputIter, PeekableIterator};
 use crate::errors::{Result, RloxError, ScanError};
 use crate::parser::Parser;
+
 pub use tokens::{Token, TokenLiteral, TokenType};
 
 pub struct Scanner {
-    source: Vec<char>,
     tokens: Vec<Token>,
-    start: usize,
-    current: usize,
-    line: usize,
-    position: usize,
     keywords: HashMap<String, TokenType>,
+}
+
+impl Debug for Scanner {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut debug_out: String = String::new();
+        debug_out.write_str("Scanner: \n").unwrap();
+
+        for sc in &self.tokens {
+            debug_out.write_fmt(format_args!("\t{sc}\n")).unwrap();
+        }
+
+        write!(f, "{debug_out}")
+    }
 }
 
 impl Default for Scanner {
     fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Scanner {
+    pub fn new() -> Scanner {
         let mut keywords = HashMap::new();
         keywords.insert("and".into(), TokenType::And);
         keywords.insert("class".into(), TokenType::Class);
@@ -55,281 +73,337 @@ impl Default for Scanner {
         keywords.insert("eof".into(), TokenType::Eof);
 
         Self {
-            source: vec![],
             tokens: vec![],
-            line: 1,
-            position: 1,
-            start: 0,
-            current: 0,
             keywords,
         }
     }
-}
 
-impl fmt::Debug for Scanner {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut debug_out: String = String::new();
-        debug_out.write_str("Scanner: \n").unwrap();
+    // TODO: Turn this whole scanning process into an iterator
+    // I want to return an iterator to the caller that, when .next()'d,
+    // returns the next token from the source.
+    // 1 Create scanner
+    // 2 Pass source to scanner
+    // 3 Iterate over scanner
+    pub fn scan_tokens(&mut self, source: &str) -> Result<()> {
+        // Create our custom iterator from the input string
+        let mut input_iter = Input::new(source).into_iter();
 
-        for sc in &self.tokens {
-            debug_out.write_fmt(format_args!("\t{sc}\n")).unwrap();
-        }
+        // Loop over each grapheme and try to scan it into tokens
+        while let Some(item) = input_iter.next() {
+            let mut lexeme = String::from_str(item).expect("tried making a string");
+            let start_line = input_iter.line();
+            let start_pos = input_iter.location();
 
-        write!(f, "{debug_out}")
-    }
-}
+            let token = match item {
+                // Single character tokens
+                "(" => Some(TokenType::LeftParen),
+                ")" => Some(TokenType::RightParen),
+                "{" => Some(TokenType::LeftBrace),
+                "}" => Some(TokenType::RightBrace),
+                "," => Some(TokenType::Comma),
+                "." => Some(TokenType::Dot),
+                "-" => Some(TokenType::Minus),
+                "+" => Some(TokenType::Plus),
+                ";" => Some(TokenType::Semicolon),
+                "/" => {
+                    if match_next_char((&mut input_iter, &mut lexeme), "/") {
+                        scan_forward_until((&mut input_iter, &mut lexeme), "\n");
+                        None
+                    } else {
+                        Some(TokenType::Slash)
+                    }
+                }
+                "*" => Some(TokenType::Star),
 
-impl Scanner {
-    pub fn new(source: &str) -> Scanner {
-        let source: Vec<char> = source.chars().collect();
-        Scanner {
-            source,
-            ..Default::default()
-        }
-    }
+                // One or two character tokens
+                "!" => {
+                    if match_next_char((&mut input_iter, &mut lexeme), "=") {
+                        Some(TokenType::BangEqual)
+                    } else {
+                        Some(TokenType::Bang)
+                    }
+                }
+                "=" => {
+                    if match_next_char((&mut input_iter, &mut lexeme), "=") {
+                        Some(TokenType::EqualEqual)
+                    } else {
+                        Some(TokenType::Equal)
+                    }
+                }
+                ">" => {
+                    if match_next_char((&mut input_iter, &mut lexeme), "=") {
+                        Some(TokenType::GreaterEqual)
+                    } else {
+                        Some(TokenType::Greater)
+                    }
+                }
+                "<" => {
+                    if match_next_char((&mut input_iter, &mut lexeme), "=") {
+                        Some(TokenType::LessEqual)
+                    } else {
+                        Some(TokenType::Less)
+                    }
+                }
 
-    pub fn scan_tokens(&mut self) -> Result<()> {
-        while !self.is_at_end() {
-            // mark the begining of scanning for
-            // multi-char tokens
-            self.start = self.current;
+                // Whitespace
+                " " | "\n" | "\t" | "\r" => None,
 
-            if let Some(token_type) = self.scan_token()? {
-                self.add_token(token_type)
+                // Literals
+                // Identifiers and reserved keywords
+                ch if is_lowercase(ch) | is_uppercase(ch) | (ch == "_") => {
+                    loop {
+                        if is_alpha_numeric(input_iter.peek()) {
+                            match input_iter.next() {
+                                Some(x) => lexeme.push_str(x),
+                                None => break,
+                            }
+                        } else {
+                            break;
+                        }
+                    }
+
+                    let keyword = self.keywords.get(&lexeme);
+
+                    // If the identifier exists in our hashmap of keywords, then treat it like a keyword
+                    if let Some(token) = keyword {
+                        Some(*token)
+                    } else {
+                        // Otherwise it"s an identifier and we lex it as such.
+                        Some(TokenType::Identifier)
+                    }
+                }
+                // Strings
+                "\"" => {
+                    string((&mut input_iter, &mut lexeme))?;
+                    Some(TokenType::String)
+                }
+                // Numbers
+                ch if is_digit(ch) => {
+                    number((&mut input_iter, &mut lexeme))?;
+                    Some(TokenType::Number)
+                }
+                x => {
+                    return Err(RloxError::Scan(ScanError::new(
+                        start_line,
+                        start_pos,
+                        x,
+                        "Character not supported",
+                    )))
+                }
+            };
+
+            match token {
+                None => (),
+                Some(token_type) => {
+                    self.tokens
+                        .push(Token::new(token_type, lexeme, start_line, start_pos));
+                }
             }
         }
 
         // Add an EOF token at end of input
         self.tokens
-            .push(Token::new(TokenType::Eof, &[], self.line, 0));
+            .push(Token::new(TokenType::Eof, "".into(), 0, 0));
 
         Ok(())
-    }
-
-    fn scan_token(&mut self) -> Result<Option<TokenType>> {
-        let ch = self.advance();
-        if ch.is_none() {
-            // Non-fatal error, but there's no more tokens.
-            return Ok(None);
-        }
-        let ch = ch.unwrap();
-
-        match ch {
-            // Single character tokens
-            '(' => Ok(Some(TokenType::LeftParen)),
-            ')' => Ok(Some(TokenType::RightParen)),
-            '{' => Ok(Some(TokenType::LeftBrace)),
-            '}' => Ok(Some(TokenType::RightBrace)),
-            ',' => Ok(Some(TokenType::Comma)),
-            '.' => Ok(Some(TokenType::Dot)),
-            '-' => Ok(Some(TokenType::Minus)),
-            '+' => Ok(Some(TokenType::Plus)),
-            ';' => Ok(Some(TokenType::Semicolon)),
-            '/' => {
-                if self.match_next_char('/') {
-                    // Read ahead to end of line
-                    while self.peek() != Some('\n') && !self.is_at_end() {
-                        self.advance();
-                    }
-                    Ok(None)
-                } else {
-                    Ok(Some(TokenType::Slash))
-                }
-            }
-            '*' => Ok(Some(TokenType::Star)),
-
-            // One or two character tokens
-            '!' => {
-                if self.match_next_char('=') {
-                    Ok(Some(TokenType::BangEqual))
-                } else {
-                    Ok(Some(TokenType::Bang))
-                }
-            }
-            '=' => {
-                if self.match_next_char('=') {
-                    Ok(Some(TokenType::EqualEqual))
-                } else {
-                    Ok(Some(TokenType::Equal))
-                }
-            }
-            '>' => {
-                if self.match_next_char('=') {
-                    Ok(Some(TokenType::GreaterEqual))
-                } else {
-                    Ok(Some(TokenType::Greater))
-                }
-            }
-            '<' => {
-                if self.match_next_char('=') {
-                    Ok(Some(TokenType::LessEqual))
-                } else {
-                    Ok(Some(TokenType::Less))
-                }
-            }
-
-            // Whitespace
-            ' ' | '\n' | '\t' | '\r' => Ok(None),
-
-            // Literals
-            // Identifiers and reserved keywords
-            'a'..='z' | 'A'..='Z' | '_' => {
-                while self.is_alpha_numeric(self.peek()) {
-                    self.advance();
-                }
-                let substring: String = self.source[self.start..self.current].iter().collect();
-                let keyword = self.keywords.get(&substring);
-
-                // If the identifier exists in our hashmap of keywords, then treat it like a keyword
-                if let Some(token) = keyword {
-                    Ok(Some(*token))
-                } else {
-                    // Otherwise it's an identifier and we lex it as such.
-                    Ok(Some(TokenType::Identifier))
-                }
-            }
-            // Strings
-            '"' => {
-                self.string()?;
-                Ok(Some(TokenType::String))
-            }
-            // Numbers
-            '0'..='9' => {
-                self.number()?;
-                Ok(Some(TokenType::Number))
-            }
-            x => Err(RloxError::Scan(ScanError::new(
-                self.line,
-                self.position - 1,
-                &format!("{}", x),
-                "Character not supported",
-            ))),
-        }
-    }
-
-    fn string(&mut self) -> Result<()> {
-        while self.peek() != Some('"') && !self.is_at_end() {
-            self.advance();
-        }
-
-        if self.is_at_end() {
-            return Err(RloxError::Scan(ScanError::new(
-                self.line,
-                self.position,
-                "",
-                "Unterminated string",
-            )));
-        }
-
-        self.advance(); // consume ending quote
-
-        Ok(())
-    }
-
-    fn number(&mut self) -> Result<()> {
-        let mut decimal = false;
-
-        while self.peek_is_digit().is_some() && !self.is_at_end() {
-            match self.peek().unwrap() {
-                '0'..='9' => {}
-                '.' => {
-                    if decimal {
-                        // we can only have 1 decimal point in a number
-                        return Err(RloxError::Scan(ScanError::new(
-                            self.line,
-                            self.position,
-                            "",
-                            "Number contained two or more decimals.",
-                        )));
-                    } else {
-                        decimal = true;
-                        self.advance();
-                        match self.peek().unwrap() {
-                            '0'..='9' => continue,
-                            _ => {
-                                return Err(RloxError::Scan(ScanError::new(
-                                    self.line,
-                                    self.position,
-                                    "",
-                                    "No digits after decimal",
-                                )));
-                            }
-                        }
-                    }
-                }
-                _ => {
-                    unimplemented!("Unreachable.")
-                }
-            }
-            self.advance();
-        }
-
-        Ok(())
-    }
-
-    // Helper functions
-    fn is_at_end(&self) -> bool {
-        self.current >= self.source.len()
-    }
-
-    fn peek(&self) -> Option<char> {
-        self.source.get(self.current).copied()
-    }
-
-    fn advance(&mut self) -> Option<char> {
-        let ch = self.peek();
-        if ch.is_some() {
-            self.current += 1;
-            self.position += 1; // position in line
-        }
-
-        if ch == Some('\n') {
-            self.line += 1; // increment line on newline
-            self.position = 1; // reset line position on newline
-        }
-
-        ch
-    }
-
-    fn match_next_char(&mut self, ch: char) -> bool {
-        if self.peek() != Some(ch) {
-            false
-        } else {
-            self.advance();
-            true
-        }
-    }
-
-    fn add_token(&mut self, token: TokenType) {
-        self.tokens.push(Token::new(
-            token,
-            &self.source[self.start..self.current],
-            self.line,
-            self.position - (self.current - self.start),
-        ));
-    }
-
-    fn peek_is_digit(&self) -> Option<bool> {
-        let ch = self.peek()?;
-        match ch {
-            '0'..='9' => Some(true),
-            '.' => Some(true),
-            _ => None,
-        }
-    }
-
-    // a-z, A-Z, 0-9, _
-    // This also accepts unicode alphanumeric code points, but that's okay for us for now.
-    fn is_alpha_numeric(&self, ch: Option<char>) -> bool {
-        if ch.is_none() {
-            return false;
-        }
-        let ch = ch.unwrap();
-        ch.is_alphanumeric() || ch == '_'
     }
 
     pub fn into_parser(self) -> Parser {
         Parser::new(self.tokens)
+    }
+}
+
+/// Helper functions
+/// These all take a ScannerState struct to build up
+/// the scanned lexeme.
+///
+fn is_digit(ch: &str) -> bool {
+    matches!(
+        ch,
+        "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
+    )
+}
+
+fn is_lowercase(ch: &str) -> bool {
+    matches!(
+        ch,
+        "a" | "b"
+            | "c"
+            | "d"
+            | "e"
+            | "f"
+            | "g"
+            | "h"
+            | "i"
+            | "j"
+            | "k"
+            | "l"
+            | "m"
+            | "n"
+            | "o"
+            | "p"
+            | "q"
+            | "r"
+            | "s"
+            | "t"
+            | "u"
+            | "v"
+            | "w"
+            | "x"
+            | "y"
+            | "z"
+    )
+}
+
+fn is_uppercase(ch: &str) -> bool {
+    matches!(
+        ch,
+        "A" | "B"
+            | "C"
+            | "D"
+            | "E"
+            | "F"
+            | "G"
+            | "H"
+            | "I"
+            | "J"
+            | "K"
+            | "L"
+            | "M"
+            | "N"
+            | "O"
+            | "P"
+            | "Q"
+            | "R"
+            | "S"
+            | "T"
+            | "U"
+            | "V"
+            | "W"
+            | "X"
+            | "Y"
+            | "Z"
+    )
+}
+
+// 0-9, .
+fn is_digit_or_decimal(ch: &str) -> bool {
+    match ch {
+        "." => true,
+        ch if is_digit(ch) => true,
+        _ => false,
+    }
+}
+
+// a-z, A-Z, 0-9, _
+fn is_alpha_numeric(ch: Option<&str>) -> bool {
+    let ch = match ch {
+        None => return false,
+        Some(char) => char,
+    };
+
+    match ch {
+        _ if is_lowercase(ch) => true,
+        _ if is_uppercase(ch) => true,
+        _ if is_digit(ch) => true,
+        "_" => true,
+        _ => false,
+    }
+}
+
+fn scan_forward_until((iter, lexeme): (&mut InputIter, &mut String), ch: &str) {
+    for x in iter {
+        // add scanned graphemes to lexeme
+        lexeme.push_str(x);
+
+        // scan forward until ch
+        if x == ch {
+            break;
+        }
+    }
+}
+
+fn match_next_char((iter, lexeme): (&mut InputIter, &mut String), ch: &str) -> bool {
+    if iter.peek() != Some(ch) {
+        false
+    } else {
+        let grapheme = iter.next().unwrap();
+        lexeme.push_str(grapheme);
+        true
+    }
+}
+
+fn string((iter, lexeme): (&mut InputIter, &mut String)) -> Result<()> {
+    scan_forward_until((iter, lexeme), "\"");
+
+    // Got to end of file without a terminating string
+    if iter.peek().is_none() {
+        return Err(RloxError::Scan(ScanError::new(
+            iter.line(),
+            iter.location(),
+            "",
+            "Unterminated string",
+        )));
+    }
+
+    Ok(())
+}
+
+fn number((iter, lexeme): (&mut InputIter, &mut String)) -> Result<()> {
+    let mut decimal = false; // have we seen a decimal yet?
+
+    loop {
+        // determine if the next char is a digit or decimal,
+        // and add it to the lexeme if so.
+        let ch = match iter.peek() {
+            None => break,
+            Some(ch) => {
+                if !is_digit_or_decimal(ch) {
+                    break;
+                } else {
+                    // once we know it's a digit or decimal, add it to the string.
+                    lexeme.push_str(ch);
+                    iter.next(); // prep the next char. this returns the same as `ch`
+                    ch
+                }
+            }
+        };
+
+        // Looking for decimals, a number can contain only one.
+        match ch {
+            "." => {
+                if decimal {
+                    // we can only have 1 decimal point in a number
+                    return Err(RloxError::Scan(ScanError::new(
+                        iter.line(),
+                        iter.location(),
+                        "",
+                        "Number contained two or more decimals.",
+                    )));
+                } else {
+                    decimal = true;
+                }
+            }
+            num if is_digit(num) => {}
+            _ => {
+                break;
+            }
+        }
+    }
+
+    // A number ending in a decimal is also an error
+    // Once scanning the number is complete, check if the last char
+    // is a decimal.
+    if lexeme.ends_with('.') {
+        Err(RloxError::Scan(ScanError::new(
+            iter.line(),
+            iter.location(),
+            "",
+            "No digits after decimal",
+        )))
+    } else {
+        // Scanning complete, no errors
+        Ok(())
     }
 }
 
@@ -339,22 +413,23 @@ mod tests {
     use tokens::*;
 
     fn setup_scanner1() -> Scanner {
-        let mut scanner = Scanner::new(
-            r#"
+        let input = r#"
             // this is a comment
             var andy = 10;
             var jonny = 3;
             if (andy and jonny) { print "Hello World" + (andy+jonny) };
-            "#,
-        );
-        scanner.scan_tokens().unwrap();
+            "#;
+
+        let mut scanner = Scanner::new();
+        scanner.scan_tokens(input).unwrap();
         scanner
     }
 
     #[test]
     fn test_and_token() {
-        let mut scanner = Scanner::new("var andy = 20; if (andy or 0) { print \"fail\"; }");
-        scanner.scan_tokens().unwrap();
+        let input = "var andy = 20; if (andy or 0) { print \"fail\"; }";
+        let mut scanner = Scanner::new();
+        scanner.scan_tokens(input).unwrap();
 
         for token in scanner.tokens {
             if token.token_type() == TokenType::And {
