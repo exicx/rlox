@@ -1,3 +1,19 @@
+// rlox: Lox interpreter/compiler in Rust.
+// Copyright (C) 2023  James Smyle <j@mes.sh>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 use unicode_segmentation::UnicodeSegmentation;
 
 pub trait PeekableIterator: Iterator {
@@ -8,18 +24,11 @@ pub struct Input<'a>(Vec<&'a str>);
 
 impl<'a> Input<'a> {
     pub fn new(source: &'a str) -> Self {
-        let graphemes = UnicodeSegmentation::graphemes(source, true).collect();
-        Self(graphemes)
+        Self(UnicodeSegmentation::graphemes(source, true).collect())
     }
 }
 
-pub struct InputIter<'a> {
-    input: Input<'a>,
-    index: usize,
-    line_num: usize,
-    line_pos: usize,
-}
-
+// Custom iterator type
 impl<'a> IntoIterator for Input<'a> {
     type Item = &'a str;
     type IntoIter = InputIter<'a>;
@@ -30,6 +39,22 @@ impl<'a> IntoIterator for Input<'a> {
             index: 0,
             input: self,
         }
+    }
+}
+
+pub struct InputIter<'a> {
+    input: Input<'a>,
+    index: usize,
+    line_num: usize,
+    line_pos: usize,
+}
+
+impl<'a> InputIter<'a> {
+    pub fn line(&self) -> usize {
+        self.line_num
+    }
+    pub fn location(&self) -> usize {
+        self.line_pos
     }
 }
 
@@ -64,14 +89,5 @@ impl<'a> PeekableIterator for InputIter<'a> {
         } else {
             Some(self.input.0[self.index])
         }
-    }
-}
-
-impl<'a> InputIter<'a> {
-    pub fn line(&self) -> usize {
-        self.line_num
-    }
-    pub fn location(&self) -> usize {
-        self.line_pos
     }
 }

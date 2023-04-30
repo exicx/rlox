@@ -1,17 +1,18 @@
 // rlox: Lox interpreter/compiler in Rust.
-//    Copyright 2023 James Smith <j@mes.sh>
+// Copyright (C) 2023  James Smyle <j@mes.sh>
 //
-//    Licensed under the Apache License, Version 2.0 (the "License");
-//    you may not use this file except in compliance with the License.
-//    You may obtain a copy of the License at
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
 //
-//        http://www.apache.org/licenses/LICENSE-2.0
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
 //
-//    Unless required by applicable law or agreed to in writing, software
-//    distributed under the License is distributed on an "AS IS" BASIS,
-//    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//    See the License for the specific language governing permissions and
-//    limitations under the License.
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 mod input;
 mod tokens;
@@ -108,9 +109,9 @@ impl Scanner {
                 "/" => {
                     if match_next_char((&mut input_iter, &mut lexeme), "/") {
                         scan_forward_until((&mut input_iter, &mut lexeme), "\n");
-                        None
+                        None // Comment (dropped by scanner)
                     } else {
-                        Some(TokenType::Slash)
+                        Some(TokenType::Slash) // /
                     }
                 }
                 "*" => Some(TokenType::Star),
@@ -118,57 +119,50 @@ impl Scanner {
                 // One or two character tokens
                 "!" => {
                     if match_next_char((&mut input_iter, &mut lexeme), "=") {
-                        Some(TokenType::BangEqual)
+                        Some(TokenType::BangEqual) // !=
                     } else {
-                        Some(TokenType::Bang)
+                        Some(TokenType::Bang) // =
                     }
                 }
                 "=" => {
                     if match_next_char((&mut input_iter, &mut lexeme), "=") {
-                        Some(TokenType::EqualEqual)
+                        Some(TokenType::EqualEqual) // ==
                     } else {
-                        Some(TokenType::Equal)
+                        Some(TokenType::Equal) // =
                     }
                 }
                 ">" => {
                     if match_next_char((&mut input_iter, &mut lexeme), "=") {
-                        Some(TokenType::GreaterEqual)
+                        Some(TokenType::GreaterEqual) // >=
                     } else {
-                        Some(TokenType::Greater)
+                        Some(TokenType::Greater) // >
                     }
                 }
                 "<" => {
                     if match_next_char((&mut input_iter, &mut lexeme), "=") {
-                        Some(TokenType::LessEqual)
+                        Some(TokenType::LessEqual) // <=
                     } else {
-                        Some(TokenType::Less)
+                        Some(TokenType::Less) // <
                     }
                 }
 
                 // Whitespace
-                " " | "\n" | "\t" | "\r" => None,
+                ch if is_whitespace(ch) => None, // Whitespace (dropped by scanner)
 
                 // Literals
                 // Identifiers and reserved keywords
                 ch if is_lowercase(ch) | is_uppercase(ch) | (ch == "_") => {
-                    loop {
-                        if is_alpha_numeric(input_iter.peek()) {
-                            match input_iter.next() {
-                                Some(x) => lexeme.push_str(x),
-                                None => break,
-                            }
-                        } else {
-                            break;
-                        }
+                    // Identifiers can begin with a-z, A-Z, or _.
+                    // But they can contain a-z, A-Z, 0-9, or _.
+                    while is_alpha_numeric(input_iter.peek()) {
+                        lexeme.push_str(input_iter.next().unwrap());
                     }
 
-                    let keyword = self.keywords.get(&lexeme);
-
                     // If the identifier exists in our hashmap of keywords, then treat it like a keyword
-                    if let Some(token) = keyword {
+                    if let Some(token) = self.keywords.get(&lexeme) {
                         Some(*token)
                     } else {
-                        // Otherwise it"s an identifier and we lex it as such.
+                        // Otherwise it's just an identifier
                         Some(TokenType::Identifier)
                     }
                 }
@@ -187,11 +181,12 @@ impl Scanner {
                         start_line,
                         start_pos,
                         x,
-                        "Character not supported",
+                        "Character not recognized",
                     )))
                 }
             };
 
+            // Add scanned token to list of tokens
             match token {
                 None => (),
                 Some(token_type) => {
@@ -203,7 +198,7 @@ impl Scanner {
 
         // Add an EOF token at end of input
         self.tokens
-            .push(Token::new(TokenType::Eof, "".into(), 0, 0));
+            .push(Token::new(TokenType::Eof, "".into(), input_iter.line(), 0));
 
         Ok(())
     }
@@ -217,6 +212,10 @@ impl Scanner {
 /// These all take a ScannerState struct to build up
 /// the scanned lexeme.
 ///
+fn is_whitespace(ch: &str) -> bool {
+    matches!(ch, " " | "\n" | "\t" | "\r")
+}
+
 fn is_digit(ch: &str) -> bool {
     matches!(
         ch,
@@ -286,15 +285,6 @@ fn is_uppercase(ch: &str) -> bool {
     )
 }
 
-// 0-9, .
-fn is_digit_or_decimal(ch: &str) -> bool {
-    match ch {
-        "." => true,
-        ch if is_digit(ch) => true,
-        _ => false,
-    }
-}
-
 // a-z, A-Z, 0-9, _
 fn is_alpha_numeric(ch: Option<&str>) -> bool {
     let ch = match ch {
@@ -312,15 +302,9 @@ fn is_alpha_numeric(ch: Option<&str>) -> bool {
 }
 
 fn scan_forward_until((iter, lexeme): (&mut InputIter, &mut String), ch: &str) {
-    for x in iter {
-        // add scanned graphemes to lexeme
-        lexeme.push_str(x);
-
-        // scan forward until ch
-        if x == ch {
-            break;
-        }
-    }
+    // Add each scanned grapheme until we hit the stopping condition
+    iter.take_while(|ic| *ic != ch)
+        .for_each(|x| lexeme.push_str(x));
 }
 
 fn match_next_char((iter, lexeme): (&mut InputIter, &mut String), ch: &str) -> bool {
@@ -334,6 +318,8 @@ fn match_next_char((iter, lexeme): (&mut InputIter, &mut String), ch: &str) -> b
 }
 
 fn string((iter, lexeme): (&mut InputIter, &mut String)) -> Result<()> {
+    // Scan till we find another double quote.
+    // Lox doesn't support escaped quotes, so this is simple.
     scan_forward_until((iter, lexeme), "\"");
 
     // Got to end of file without a terminating string
@@ -350,61 +336,37 @@ fn string((iter, lexeme): (&mut InputIter, &mut String)) -> Result<()> {
 }
 
 fn number((iter, lexeme): (&mut InputIter, &mut String)) -> Result<()> {
-    let mut decimal = false; // have we seen a decimal yet?
-
-    loop {
-        // determine if the next char is a digit or decimal,
-        // and add it to the lexeme if so.
-        let ch = match iter.peek() {
-            None => break,
-            Some(ch) => {
-                if !is_digit_or_decimal(ch) {
-                    break;
-                } else {
-                    // once we know it's a digit or decimal, add it to the string.
-                    lexeme.push_str(ch);
-                    iter.next(); // prep the next char. this returns the same as `ch`
-                    ch
-                }
-            }
-        };
-
-        // Looking for decimals, a number can contain only one.
-        match ch {
-            "." => {
-                if decimal {
-                    // we can only have 1 decimal point in a number
-                    return Err(RloxError::Scan(ScanError::new(
-                        iter.line(),
-                        iter.location(),
-                        "",
-                        "Number contained two or more decimals.",
-                    )));
-                } else {
-                    decimal = true;
-                }
-            }
-            num if is_digit(num) => {}
-            _ => {
-                break;
-            }
+    for item in iter.by_ref() {
+        if is_digit(item) || item == "." {
+            lexeme.push_str(item);
+        } else {
+            break;
         }
+    }
+
+    // If the scanned number has more than one decimal, then we fail
+    if lexeme.chars().filter(|ch| *ch == '.').count() > 1 {
+        return Err(RloxError::Scan(ScanError::new(
+            iter.line(),
+            iter.location(),
+            &lexeme,
+            "Number contained two or more decimals",
+        )));
     }
 
     // A number ending in a decimal is also an error
     // Once scanning the number is complete, check if the last char
     // is a decimal.
     if lexeme.ends_with('.') {
-        Err(RloxError::Scan(ScanError::new(
+        return Err(RloxError::Scan(ScanError::new(
             iter.line(),
             iter.location(),
-            "",
+            &lexeme,
             "No digits after decimal",
-        )))
-    } else {
-        // Scanning complete, no errors
-        Ok(())
+        )));
     }
+
+    Ok(())
 }
 
 #[cfg(test)]

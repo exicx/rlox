@@ -1,11 +1,11 @@
 [package]
 name = "rlox"
-authors = ["James Smith <j@mes.sh>"]
-version = "0.5.0"
+authors = ["James Smyle <j@mes.sh>"]
+version = "0.6.0"
 edition = "2021"
 description = "rlox: interpreter/compiler of the lox language"
 readme = "README.md"
-license = "MIT OR Apache-2.0"
+license = "GPL-3.0-or-later"
 keywords = ["language", "lox"]
 publish = false
 repository = "https://gitlab.com/exicx/rlox"
