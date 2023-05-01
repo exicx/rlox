@@ -349,7 +349,7 @@ fn number((iter, lexeme): (&mut InputIter, &mut String)) -> Result<()> {
         return Err(RloxError::Scan(ScanError::new(
             iter.line(),
             iter.location(),
-            &lexeme,
+            lexeme,
             "Number contained two or more decimals",
         )));
     }
@@ -361,7 +361,7 @@ fn number((iter, lexeme): (&mut InputIter, &mut String)) -> Result<()> {
         return Err(RloxError::Scan(ScanError::new(
             iter.line(),
             iter.location(),
-            &lexeme,
+            lexeme,
             "No digits after decimal",
         )));
     }
