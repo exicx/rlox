@@ -69,10 +69,6 @@ impl Interpreter {
             Stmt::Expression(expr) => {
                 self.evaluate(expr)?;
             }
-            Stmt::Print(expr) => {
-                let result = self.evaluate(expr)?;
-                println!("{result}");
-            }
             Stmt::Var(ident, init) => {
                 let result = match init {
                     Some(expr) => self.evaluate(expr)?,
@@ -106,7 +102,7 @@ impl Interpreter {
                 }
             }
             Stmt::Fun(ident, params, body) => {
-                let fun = LoxFunction::new(&ident, params, body);
+                let fun = LoxFunction::new(&ident, params, body, environment::from(&self.env));
                 environment::define(&self.env, &ident, LoxType::Fun(fun));
             }
             // TODO: Use token to improve interpreter error messages.
@@ -123,16 +119,10 @@ impl Interpreter {
         Ok(None)
     }
 
-    fn execute_block(&mut self, body: Vec<Stmt>, env: RfEnv) -> Result<Option<Return>> {
+    fn execute_block(&mut self, body: Vec<Stmt>) -> Result<Option<Return>> {
         // This function is just like execute(), but it's specific to trait Callable
         // We give it its own environment to handle 1) functions, 2) closures.
         // We also deal with return values, unlike execute().
-
-        // Preserve the old call stack
-        let old_stack = Rc::clone(&self.env);
-
-        // Put in place the new stack
-        self.env = env;
 
         for statement in body {
             if let Some(ret) = self.execute(statement)? {
@@ -141,9 +131,6 @@ impl Interpreter {
                 return Ok(Some(ret));
             }
         }
-
-        // Restore the old stack
-        self.env = old_stack;
 
         Ok(None)
     }
@@ -203,6 +190,7 @@ impl Interpreter {
                 let call: Box<dyn Callable> = match callee {
                     LoxType::Fun(callee) => Box::new(callee),
                     LoxType::Clock(callee) => Box::new(callee),
+                    LoxType::Print(callee) => Box::new(callee),
                     other => {
                         return Err(RloxError::Interpret(RuntimeError::NotACallableType(
                             other.to_string(),

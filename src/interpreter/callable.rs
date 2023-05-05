@@ -15,7 +15,10 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::fmt::{Debug, Display};
+use std::rc::Rc;
 use std::time::SystemTime;
+
+use log::debug;
 
 use super::environment::{self, RfEnv};
 use super::{Interpreter, LoxType};
@@ -33,7 +36,7 @@ pub trait Callable: Debug + Display {
 #[derive(Debug, Clone)]
 pub struct LoxFunction {
     name: String,
-    closure: Option<RfEnv>,
+    closure: RfEnv,
     params: Vec<Token>,
     body: Vec<Stmt>,
 }
@@ -45,9 +48,9 @@ impl Display for LoxFunction {
 }
 
 impl LoxFunction {
-    pub fn new(name: &str, params: Vec<Token>, body: Vec<Stmt>) -> Self {
+    pub fn new(name: &str, params: Vec<Token>, body: Vec<Stmt>, closure: RfEnv) -> Self {
         Self {
-            closure: None,
+            closure,
             name: name.to_string(),
             params,
             body,
@@ -62,12 +65,7 @@ impl Callable for LoxFunction {
 
     fn call(&self, interpreter: &mut Interpreter, arguments: &[LoxType]) -> Result<LoxType> {
         assert_eq!(self.params.len(), arguments.len());
-
-        // Create an environment, branched from the global environment
-        // In that environment, bind the arguments to the parameters from
-        // the function declaration.
-
-        let env = environment::from(&interpreter.global);
+        debug!("calling: {}", self.name);
 
         // Zip up arguments and their results
         // Bind each value to its name in the new environment
@@ -75,14 +73,25 @@ impl Callable for LoxFunction {
         let items = self.params.iter().zip(arguments.iter());
 
         for (token, loxtype) in items {
-            environment::define(&env, token.lexeme(), loxtype.clone())
+            environment::define(&self.closure, token.lexeme(), loxtype.clone());
         }
 
+        // Preserve the old call stack
+        let old_stack = Rc::clone(&interpreter.env);
+
+        // Put in place the new stack
+        interpreter.env = Rc::clone(&self.closure);
+
         // Execute function and return its (optional) return value
-        match interpreter.execute_block(self.body.clone(), env)? {
+        let ret = match interpreter.execute_block(self.body.clone())? {
             Some(ret) => Ok(ret.0),
             None => Ok(LoxType::Nil),
-        }
+        };
+
+        // Restore the old stack
+        interpreter.env = old_stack;
+
+        ret
     }
 }
 

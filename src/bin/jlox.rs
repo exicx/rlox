@@ -25,6 +25,8 @@ use rlox::interpreter::Interpreter;
 use rlox::scanner::Scanner;
 
 fn main() -> Result<(), Box<dyn Error>> {
+    env_logger::init();
+
     let cmdline: Vec<String> = args().collect();
 
     match cmdline.len() {

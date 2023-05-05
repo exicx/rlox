@@ -24,22 +24,22 @@ use crate::errors::{Result, RloxError, RuntimeError};
 
 use super::LoxType;
 
-pub(super) type RfEnv = Rc<RefCell<Environment>>;
+pub type RfEnv = Rc<RefCell<Environment>>;
 
 #[derive(Debug, Clone)]
-pub(super) struct Environment {
+pub struct Environment {
     parent: Option<RfEnv>,
     env: HashMap<String, LoxType>,
 }
 
-pub(super) fn new_global() -> RfEnv {
+pub fn new_global() -> RfEnv {
     Rc::new(RefCell::new(Environment {
         parent: None,
         env: HashMap::new(),
     }))
 }
 
-pub(super) fn from(env: &RfEnv) -> RfEnv {
+pub fn from(env: &RfEnv) -> RfEnv {
     debug!("from");
     Rc::new(RefCell::new(Environment {
         parent: Some(Rc::clone(env)),
@@ -48,7 +48,7 @@ pub(super) fn from(env: &RfEnv) -> RfEnv {
 }
 
 // Drop the top-most scope, but never global
-pub(super) fn drop(rfenv: &RfEnv) -> RfEnv {
+pub fn drop(rfenv: &RfEnv) -> RfEnv {
     debug!("dropping");
 
     match rfenv.borrow().parent {
@@ -58,14 +58,14 @@ pub(super) fn drop(rfenv: &RfEnv) -> RfEnv {
 }
 
 // Define a new type
-pub(super) fn define(env: &RfEnv, key: &str, val: LoxType) {
+pub fn define(env: &RfEnv, key: &str, val: LoxType) {
     debug!("defining: {}", key);
     env.borrow_mut().env.insert(key.to_string(), val);
 }
 
 // Return value if it exists, otherwise error
 // Recurses up call stack
-pub(super) fn get(rfenv: &RfEnv, key: &str) -> Result<LoxType> {
+pub fn get(rfenv: &RfEnv, key: &str) -> Result<LoxType> {
     debug!("getting: {}", key);
 
     match rfenv.borrow().env.get(key) {
@@ -80,7 +80,7 @@ pub(super) fn get(rfenv: &RfEnv, key: &str) -> Result<LoxType> {
     }
 }
 
-pub(super) fn assign(rfenv: &RfEnv, key: &str, val: LoxType) -> Result<()> {
+pub fn assign(rfenv: &RfEnv, key: &str, val: LoxType) -> Result<()> {
     debug!("assigning: {}", key);
 
     // return error if variable isn't defined.
