@@ -89,7 +89,7 @@ impl Interpreter {
                 }
 
                 // Return to previous scope
-                self.env = environment::drop(&self.env).clone();
+                self.env = environment::drop(&self.env);
             }
             Stmt::If(condition, then_branch, else_branch) => {
                 if is_truthy(&self.evaluate(condition)?) {
