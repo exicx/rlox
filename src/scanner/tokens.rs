@@ -53,7 +53,6 @@ pub enum TokenType {
     If,
     Nil,
     Or,
-    Print,
     Return,
     Super,
     This,

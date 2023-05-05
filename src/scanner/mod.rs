@@ -63,8 +63,6 @@ impl Scanner {
         keywords.insert("if".into(), TokenType::If);
         keywords.insert("nil".into(), TokenType::Nil);
         keywords.insert("or".into(), TokenType::Or);
-        // we can remove this if we break compatibility with Lox
-        keywords.insert("print".into(), TokenType::Print);
         keywords.insert("return".into(), TokenType::Return);
         keywords.insert("super".into(), TokenType::Super);
         keywords.insert("this".into(), TokenType::This);
@@ -380,7 +378,7 @@ mod tests {
             // this is a comment
             var andy = 10;
             var jonny = 3;
-            if (andy and jonny) { print "Hello World" + (andy+jonny) };
+            if (andy and jonny) { print("Hello World" + (andy+jonny)); };
             "#;
 
         let mut scanner = Scanner::new();
@@ -390,7 +388,7 @@ mod tests {
 
     #[test]
     fn test_and_token() {
-        let input = "var andy = 20; if (andy or 0) { print \"fail\"; }";
+        let input = "var andy = 20; if (andy or 0) { print(\"fail\"); }";
         let mut scanner = Scanner::new();
         scanner.scan_tokens(input).unwrap();
 

@@ -138,9 +138,6 @@ impl Parser {
         if self.is_any_tokens(&[TokenType::If]) {
             // If condition
             self.if_stmt()
-        } else if self.is_any_tokens(&[TokenType::Print]) {
-            // We're a `print` statement
-            self.print_stmt()
         } else if self.is_any_tokens(&[TokenType::LeftBrace]) {
             // New block/scope
             Ok(Stmt::Block(self.block_stmt()?))
@@ -156,13 +153,6 @@ impl Parser {
             // We're an expression
             self.expression_stmt()
         }
-    }
-
-    // Evaluate the expression and return Stmt::Print(result)
-    fn print_stmt(&mut self) -> Result<Stmt> {
-        let value = self.expression()?;
-        self.consume(TokenType::Semicolon, "Expect ';' after value.")?;
-        Ok(Stmt::Print(value))
     }
 
     fn block_stmt(&mut self) -> Result<Vec<Stmt>> {
@@ -551,7 +541,6 @@ impl Parser {
                 | TokenType::For
                 | TokenType::If
                 | TokenType::While
-                | TokenType::Print
                 | TokenType::Return => return,
                 _ => {}
             }
