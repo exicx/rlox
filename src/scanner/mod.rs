@@ -336,8 +336,9 @@ fn string((iter, lexeme): (&mut InputIter, &mut String)) -> Result<()> {
 }
 
 fn number((iter, lexeme): (&mut InputIter, &mut String)) -> Result<()> {
-    for item in iter.by_ref() {
+    while let Some(item) = iter.peek() {
         if is_digit(item) || item == "." {
+            iter.next();
             lexeme.push_str(item);
         } else {
             break;
