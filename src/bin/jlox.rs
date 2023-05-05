@@ -19,6 +19,7 @@ use std::error::Error;
 use std::fs::File;
 use std::io::{self, Write};
 
+use log::debug;
 use rlox::errors::{ParseError, RloxError};
 use rlox::interpreter::Interpreter;
 use rlox::scanner::Scanner;
@@ -49,11 +50,12 @@ fn run(interpreter: &mut Interpreter, input: &str) -> Result<(), RloxError> {
     let mut scanner = Scanner::new();
     scanner.scan_tokens(input)?;
 
+    debug!("{:?}", scanner);
+
     // Parse the input and evaluate expressions
     let program = scanner.into_parser().parse();
 
-    // Does this work?
-    // We want to print all parsing errors
+    // Print all errors we've found from parsing
     for res in &program {
         if let Err(err) = res {
             println!("{}", err);
@@ -69,6 +71,14 @@ fn run(interpreter: &mut Interpreter, input: &str) -> Result<(), RloxError> {
     // Collect just the successful parses.
     // This is either everything, or nothing. Because we exited in the last step
     let program: Result<Vec<_>, RloxError> = program.into_iter().collect();
+
+    // debugging
+    if let Ok(program) = &program {
+        for stmt in program {
+            debug!("{:?}", stmt);
+        }
+    }
+
     interpreter.interpret(program?)
 }
 
