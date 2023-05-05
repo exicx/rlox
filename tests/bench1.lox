@@ -1,3 +1,7 @@
+// Because of the extra Block statements we're currently creating for `for` loops,
+// `while` loops are significantly faster. The runtime of this was reduced from
+// 26 to 18 seconds by replacing the 3 for loops with while loops.
+
 var start;
 
 fun start_bench() {
@@ -15,20 +19,28 @@ fun end_bench() {
 fun fib(limit) {
   var a = 0;
   var temp;
+  var b = 1;
 
-  for (var b = 1; a < limit; b = temp + b) {
+  while (a < limit) {
     temp = a;
     a = b;
+    b = temp + b;
   }
 }
 
 fun bench() {
   start_bench();
-  for (var i = 0; i < 1000; i = i + 1) {
-    for (var j = 0; j < 1000; j = j + 1) {
+  var i = 0;
+
+  while (i < 1000) {
+    var j = 0;
+    while (j < 1000) {
       fib(10000);
+      j = j + 1;
     }
+    i = i + 1;
   }
+
   end_bench();
 }
 
