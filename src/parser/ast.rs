@@ -57,3 +57,60 @@ pub enum ExprLiteral {
     String(String),
     Nil,
 }
+
+//
+// WIP
+//
+//
+
+// impl std::fmt::Display for Stmt {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         match self {
+//             Stmt::Block(ref v) => {
+//                 writeln!(f, "block: ");
+//                 for stmt in v {
+//                     writeln!(f, "  {}", stmt);
+//                 }
+//             }
+//             Stmt::Expression(expr) => {
+//                 writeln!(f, "{}", expr);
+//             }
+//         }
+
+//         writeln!(f, "");
+//         Ok(())
+//     }
+// }
+
+// impl std::fmt::Display for Expr {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         match self {
+//             Expr::Assign(s, expr) => {
+//                 write!(f, "{} = {}", s, expr)
+//             }
+//             Expr::Binary(a, tt, b) => {
+//                 write!(f, "{} {:?} {}", a, tt, b)
+//             }
+//             Expr::Call(name, _, params) => {
+//                 write!(f, "{}({})", name, params)
+//             }
+//         }
+//     }
+// }
+
+// impl std::fmt::Display for ExprLiteral {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         match self {
+//             ExprLiteral::Bool(b) => {
+//                 if *b {
+//                     write!(f, "true")
+//                 } else {
+//                     write!(f, "false")
+//                 }
+//             }
+//             ExprLiteral::Number(n) => write!(f, "{}", n),
+//             ExprLiteral::String(s) => write!(f, "{}", s),
+//             ExprLiteral::Nil => write!(f, "nil"),
+//         }
+//     }
+// }

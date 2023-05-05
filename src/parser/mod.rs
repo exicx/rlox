@@ -260,6 +260,19 @@ impl Parser {
             body = Stmt::Block(vec![expr, body]);
         }
 
+        // TODO we create an extra Block statement (and create a new environment)
+        // because we desguar for-loops into a statement like
+        // block {
+        //   block {
+        //     initializer;
+        //     while(condition) block {
+        //        body;
+        //        increment;
+        //     }
+        //   }
+        // }
+        //
+        // this is unnecessary but it's not "wrong." it does slow down variable resolution
         Ok(body)
     }
 
