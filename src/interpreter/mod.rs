@@ -19,30 +19,35 @@ mod environment; // Call stack
 mod loxreturn;
 mod loxtype;
 
+use std::rc::Rc;
+
 use crate::errors::{Result, RloxError, RuntimeError};
 use crate::parser::ast::{Expr, ExprLiteral, Stmt};
 use crate::scanner::TokenType;
 use callable::{Callable, FfiClock, FfiPrint, LoxFunction};
-use environment::Environment;
+use environment::RfEnv;
 use loxreturn::Return;
 use loxtype::LoxType;
 
 pub struct Interpreter {
-    env: Environment,
+    global: RfEnv,
+    env: RfEnv,
 }
 
 impl Default for Interpreter {
     fn default() -> Self {
-        let mut env = Environment::new();
-        env.define("clock", LoxType::Clock(FfiClock {}));
-        env.define("print", LoxType::Print(FfiPrint {}));
-        Self { env }
+        Self::new()
     }
 }
 
 impl Interpreter {
     pub fn new() -> Self {
-        Default::default()
+        let global = environment::new_global();
+        let env = Rc::clone(&global);
+
+        environment::define(&global, "clock", LoxType::Clock(FfiClock {}));
+        environment::define(&global, "print", LoxType::Print(FfiPrint {}));
+        Self { global, env }
     }
 
     //
@@ -68,15 +73,15 @@ impl Interpreter {
                 let result = self.evaluate(expr)?;
                 println!("{result}");
             }
-            Stmt::Var(identifier, initializer) => {
-                let result = match initializer {
+            Stmt::Var(ident, init) => {
+                let result = match init {
                     Some(expr) => self.evaluate(expr)?,
                     None => LoxType::Nil,
                 };
-                self.env.define(&identifier, result);
+                environment::define(&self.env, &ident, result);
             }
             Stmt::Block(block) => {
-                self.env.new_scope();
+                self.env = environment::from(&self.env);
 
                 // Execute statements
                 for stmt in block {
@@ -84,7 +89,7 @@ impl Interpreter {
                 }
 
                 // Return to previous scope
-                self.env.drop();
+                self.env = environment::drop(&self.env).clone();
             }
             Stmt::If(condition, then_branch, else_branch) => {
                 if is_truthy(&self.evaluate(condition)?) {
@@ -100,9 +105,9 @@ impl Interpreter {
                     self.execute(*stmt.clone())?;
                 }
             }
-            Stmt::Fun(name, params, body) => {
-                let fun = LoxFunction::new(&name, params, body);
-                self.env.define(&name, LoxType::Fun(fun));
+            Stmt::Fun(ident, params, body) => {
+                let fun = LoxFunction::new(&ident, params, body);
+                environment::define(&self.env, &ident, LoxType::Fun(fun));
             }
             // TODO: Use token to improve interpreter error messages.
             Stmt::Return(_tok, expr) => {
@@ -118,16 +123,16 @@ impl Interpreter {
         Ok(None)
     }
 
-    fn execute_block(
-        &mut self,
-        body: Vec<Stmt>,
-        environment: Environment,
-    ) -> Result<Option<Return>> {
+    fn execute_block(&mut self, body: Vec<Stmt>, env: RfEnv) -> Result<Option<Return>> {
         // This function is just like execute(), but it's specific to trait Callable
         // We give it its own environment to handle 1) functions, 2) closures.
-        // We also deal with return values that execute() ignores.
+        // We also deal with return values, unlike execute().
 
-        // TODO: Handle environment.
+        // Preserve the old call stack
+        let old_stack = Rc::clone(&self.env);
+
+        // Put in place the new stack
+        self.env = env;
 
         for statement in body {
             if let Some(ret) = self.execute(statement)? {
@@ -136,6 +141,9 @@ impl Interpreter {
                 return Ok(Some(ret));
             }
         }
+
+        // Restore the old stack
+        self.env = old_stack;
 
         Ok(None)
     }
@@ -155,18 +163,18 @@ impl Interpreter {
             },
             Expr::Variable(ident) => {
                 // Accessing a variable.
-                Ok(self.env.get(&ident)?.clone())
+                Ok(environment::get(&Rc::clone(&self.env), &ident)?)
             }
             // Recursively evaluate grouping's subexpressions.
             Expr::Grouping(group) => self.evaluate(*group),
             Expr::Unary(token, expr) => self.unary(token, *expr),
             Expr::Binary(expr1, token, expr2) => self.binary(*expr1, token, *expr2),
-            Expr::Assign(name, expr) => {
+            Expr::Assign(ident, expr) => {
                 // Try to evaluate the r-value
                 let exprres = self.evaluate(*expr)?;
                 // TODO: This clone() is really gross.
                 // Assign r-value to l-value
-                self.env.assign(&name, exprres.clone())?;
+                environment::assign(&self.env, &ident, exprres.clone())?;
                 Ok(exprres)
             }
             Expr::Logical(left, operator, right) => {

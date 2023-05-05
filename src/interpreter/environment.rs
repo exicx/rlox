@@ -14,141 +14,91 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
+
+use log::debug;
 
 use crate::errors::{Result, RloxError, RuntimeError};
 
 use super::LoxType;
 
-/*
- * We need to keep a linked list of Environments, where later entires
- * are more local environments.
- * Each Environment contains the named declarations of a scope.
- * Global scope is the parent Environment of every chain.
- * When functions are executed, they need a new environment that only
- * has the global scope as a parent.
- *
- * So we'll have at least two things pointing to the global scope, each needing
- * an exclusive reference (&mut). For this we'll have to use Rc.
- *
- * From:
- *
- * struct Interpreter {
- *   env: Environment,
- * }
- *
- * struct Environment {
- *   scopes: Vec<Scope>,
- * }
- *
- * To:
- *
- * struct Interpreter {
- *   env: Environment,
- * }
- *
- * struct Environment {
- *   parent: Option<Box<Environment>>,
- *   values: HashMap<String, LoxType>,
- * }
- */
-
-#[derive(Debug, Clone)]
-struct Scope {
-    values: HashMap<String, LoxType>,
-}
-
-impl Default for Scope {
-    fn default() -> Self {
-        let mut values = HashMap::new();
-        values.reserve(4);
-        Self { values }
-    }
-}
+pub(super) type RfEnv = Rc<RefCell<Environment>>;
 
 #[derive(Debug, Clone)]
 pub(super) struct Environment {
-    scopes: Vec<Scope>,
+    parent: Option<RfEnv>,
+    env: HashMap<String, LoxType>,
 }
 
-impl Default for Environment {
-    fn default() -> Self {
-        Self {
-            scopes: vec![Scope::default()],
-        }
+pub(super) fn new_global() -> RfEnv {
+    Rc::new(RefCell::new(Environment {
+        parent: None,
+        env: HashMap::new(),
+    }))
+}
+
+pub(super) fn from(env: &RfEnv) -> RfEnv {
+    debug!("from");
+    Rc::new(RefCell::new(Environment {
+        parent: Some(Rc::clone(env)),
+        env: HashMap::new(),
+    }))
+}
+
+// Drop the top-most scope, but never global
+pub(super) fn drop(rfenv: &RfEnv) -> RfEnv {
+    debug!("dropping");
+
+    match rfenv.borrow().parent {
+        None => Rc::clone(rfenv),
+        Some(ref parent) => Rc::clone(parent),
     }
 }
 
-impl Environment {
-    pub fn new() -> Self {
-        Self {
-            ..Default::default()
-        }
-    }
+// Define a new type
+pub(super) fn define(env: &RfEnv, key: &str, val: LoxType) {
+    debug!("defining: {}", key);
+    env.borrow_mut().env.insert(key.to_string(), val);
+}
 
-    // Create a new scope at the end of the queue
-    pub fn new_scope(&mut self) {
-        self.scopes.push(Scope::default());
-    }
+// Return value if it exists, otherwise error
+// Recurses up call stack
+pub(super) fn get(rfenv: &RfEnv, key: &str) -> Result<LoxType> {
+    debug!("getting: {}", key);
 
-    // Drop the top-most scope
-    // self.scopes[0] is the global scope, don't allow dropping
-    // that one.
-    pub fn drop(&mut self) -> bool {
-        if self.scopes.len() > 1 {
-            self.scopes.pop();
-            true
-        } else {
-            // return false when all scopes are dropped (except for global)
-            false
-        }
-    }
-
-    // Define a new type
-    pub fn define(&mut self, name: &str, res: LoxType) {
-        self.scopes
-            .last_mut()
-            .unwrap()
-            .values
-            .insert(name.to_string(), res);
-    }
-
-    // Drop value
-    #[allow(dead_code)]
-    pub fn undefine(&mut self, name: &str) {
-        self.scopes.last_mut().unwrap().values.remove(name);
-    }
-
-    // Return value if it exists, otherwise error
-    // Recurses up call stack
-    pub fn get(&self, name: &str) -> Result<&LoxType> {
-        let stack_iter = self.scopes.iter().rev();
-        for stack in stack_iter {
-            match stack.values.get(name) {
-                None => continue,
-                Some(expr) => return Ok(expr),
+    match rfenv.borrow().env.get(key) {
+        None => {
+            debug!("  {} not found in this environment.", key);
+            match rfenv.borrow().parent {
+                None => Err(RloxError::Interpret(RuntimeError::UndefinedVariable)),
+                Some(ref parent) => get(parent, key),
             }
         }
-
-        Err(RloxError::Interpret(RuntimeError::UndefinedVariable))
+        Some(val) => Ok(val.clone()),
     }
+}
 
-    pub fn assign(&mut self, name: &str, res: LoxType) -> Result<()> {
-        // return error if variable isn't defined.
-        self.get(name)
-            .map_err(|_| RloxError::Interpret(RuntimeError::UndefinedVariableAssignment))?;
+pub(super) fn assign(rfenv: &RfEnv, key: &str, val: LoxType) -> Result<()> {
+    debug!("assigning: {}", key);
 
-        let stack_iter = self.scopes.iter_mut().rev();
-        for stack in stack_iter {
-            if stack.values.get(name).is_none() {
-                continue;
-            }
-            stack.values.insert(name.to_string(), res);
-            break;
+    // return error if variable isn't defined.
+    get(rfenv, key).map_err(|_| RloxError::Interpret(RuntimeError::UndefinedVariableAssignment))?;
+
+    // we know the assignment exists somewhere, so now we just need to find it.
+    // check current scope
+
+    if rfenv.borrow().env.get(key).is_none() {
+        match &rfenv.borrow().parent {
+            Some(parent) => return assign(parent, key, val),
+            _ => unreachable!(),
         }
-
-        Ok(())
+    } else {
+        rfenv.borrow_mut().env.insert(key.to_string(), val);
     }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -157,17 +107,17 @@ mod tests {
 
     #[test]
     fn test_basics() {
-        let mut env = Environment::default();
+        let env = new_global();
 
-        env.define("var1", LoxType::Bool(true));
-        env.define("var2", LoxType::Nil);
+        define(&env, "var1", LoxType::Bool(true));
+        define(&env, "var2", LoxType::Nil);
 
-        if let Ok(&LoxType::Nil) = env.get("var2") {
+        if let Ok(LoxType::Nil) = get(&env, "var2") {
         } else {
             panic!("Mismatched types.");
         }
 
-        if let Ok(&LoxType::Bool(true)) = env.get("var1") {
+        if let Ok(LoxType::Bool(true)) = get(&env, "var1") {
         } else {
             panic!("Mismatched types.");
         }
@@ -175,10 +125,11 @@ mod tests {
 
     #[test]
     fn test_assignment() {
-        let mut env = Environment::default();
+        let env = new_global();
 
-        env.define("var_test", LoxType::Bool(true));
-        match env.assign("var_test", LoxType::Bool(false)) {
+        define(&env, "var_test", LoxType::Bool(true));
+
+        match assign(&env, "var_test", LoxType::Bool(false)) {
             Ok(_) => (),
             Err(e) => {
                 panic!("{e}");
@@ -189,12 +140,12 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_failing_assignment() {
-        let mut env = Environment::default();
+        let env = new_global();
 
-        env.define("fail_me", LoxType::Bool(true));
+        define(&env, "fail_me", LoxType::Bool(true));
 
         // Fails because "var_test" was not previously defined
-        match env.assign("var_test", LoxType::Bool(false)) {
+        match assign(&env, "var_test", LoxType::Bool(false)) {
             Ok(_) => (),
             Err(e) => {
                 panic!("{e}");
@@ -204,46 +155,65 @@ mod tests {
 
     #[test]
     fn test_nested_get() {
-        let mut root = Environment::default();
-        root.define("name1", LoxType::Bool(true));
-        root.define("name2", LoxType::Bool(false));
-        root.new_scope();
-        root.define("name3", LoxType::String("Found".to_string()));
-        root.new_scope();
+        let root = new_global();
+        let global = Rc::clone(&root);
+        define(&root, "name1", LoxType::Bool(true));
+        define(&root, "name2", LoxType::Bool(false));
 
-        if root.get("name1").is_err() {
+        let env1 = from(&root);
+        define(&root, "name3", LoxType::String("Found".to_string()));
+
+        let env2 = from(&root);
+
+        if get(&root, "name1").is_err() {
             panic!("Nested environments did not work");
         }
-        if root.get("name2").is_err() {
+        if get(&root, "name2").is_err() {
             panic!("Nested environments did not work");
         }
 
-        if root.get("name3").is_err() {
+        if get(&root, "name3").is_err() {
             panic!("Nested environments did not work");
         }
     }
 
     #[test]
+    fn test_simple_assignment() {
+        let root = new_global();
+        let env1 = from(&root);
+
+        define(&root, "name1", LoxType::Nil);
+        define(&env1, "name2", LoxType::Nil);
+        if let Ok(LoxType::Nil) = get(&env1, "name1") {
+        } else {
+            panic!("name was not defined.");
+        }
+
+        assign(&env1, "name1", LoxType::Bool(true));
+        if let Ok(LoxType::Bool(true)) = get(&env1, "name1") {
+        } else {
+            panic!("name was not defined.");
+        }
+    }
+
+    #[test]
     fn test_nested_assignment() {
-        let mut root = Environment::default();
-        root.define("name1", LoxType::Bool(true));
-        root.define("name2", LoxType::Bool(false));
+        let root = new_global();
+        let env1 = from(&root);
+        let env2 = from(&env1);
 
-        root.new_scope();
-        root.define("name3", LoxType::String("Found".to_string()));
+        define(&root, "name1", LoxType::Bool(true));
+        define(&root, "name2", LoxType::Bool(false));
+        define(&env1, "name3", LoxType::String("Found".to_string()));
 
-        root.new_scope();
-        if root.assign("name4", LoxType::Number(32.)).is_ok() {
+        if assign(&env2, "name4", LoxType::Number(32.)).is_ok() {
             panic!("Shouldn't assign to unknown variable.");
         }
-        if root.assign("name1", LoxType::Nil).is_err() {
+        if assign(&env2, "name1", LoxType::Nil).is_err() {
             panic!("Should assign to known variable in nested scope.");
         }
 
-        root.drop();
-        root.drop();
-
-        if let Ok(&LoxType::Nil) = root.get("name1") {
+        if let Ok(LoxType::Nil) = get(&root, "name1") {
         } else {
             panic!("Did not overwrite variable in parent scope.");
         }
@@ -253,25 +223,26 @@ mod tests {
     fn dont_drop_globals() {
         // Ensure we can't accidentally drop the global environment
 
-        let mut global = Environment::default();
-        global.define("fun1", LoxType::Number(10.));
+        let mut root = new_global();
+        define(&root, "fun1", LoxType::Number(10.));
+        let global = Rc::clone(&root);
 
-        // Create a bunch of environment and then drop them
+        // Create a bunch of environments and then drop them
         for _ in 1..10 {
-            global.new_scope();
+            root = from(&root);
         }
         for _ in 1..5 {
-            global.drop();
+            root = drop(&root);
         }
         for _ in 1..10 {
-            global.new_scope();
+            root = from(&root);
         }
         for _ in 1..20 {
-            global.drop();
+            root = drop(&root);
         }
 
         // Ensure final environment still contains our globals
-        match global.get("fun1") {
+        match get(&global, "fun1") {
             Ok(_) => (),
             Err(_) => panic!("Dropped the global environment"),
         }

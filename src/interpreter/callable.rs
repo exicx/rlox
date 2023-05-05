@@ -17,7 +17,8 @@
 use std::fmt::{Debug, Display};
 use std::time::SystemTime;
 
-use super::{environment::Environment, Interpreter, LoxType};
+use super::environment::{self, RfEnv};
+use super::{Interpreter, LoxType};
 use crate::errors::Result;
 use crate::parser::ast::Stmt;
 use crate::scanner::Token;
@@ -32,7 +33,7 @@ pub trait Callable: Debug + Display {
 #[derive(Debug, Clone)]
 pub struct LoxFunction {
     name: String,
-    closure: Environment,
+    closure: Option<RfEnv>,
     params: Vec<Token>,
     body: Vec<Stmt>,
 }
@@ -46,7 +47,7 @@ impl Display for LoxFunction {
 impl LoxFunction {
     pub fn new(name: &str, params: Vec<Token>, body: Vec<Stmt>) -> Self {
         Self {
-            closure: Environment::new(),
+            closure: None,
             name: name.to_string(),
             params,
             body,
@@ -66,11 +67,7 @@ impl Callable for LoxFunction {
         // In that environment, bind the arguments to the parameters from
         // the function declaration.
 
-        // This is the worst thing I've ever done
-        // TODO: This doesn't even work.
-        let mut env = interpreter.env.clone();
-        while env.drop() {}
-        env.new_scope();
+        let env = environment::from(&interpreter.global);
 
         // Zip up arguments and their results
         // Bind each value to its name in the new environment
@@ -78,7 +75,7 @@ impl Callable for LoxFunction {
         let items = self.params.iter().zip(arguments.iter());
 
         for (token, loxtype) in items {
-            env.define(token.lexeme(), loxtype.clone());
+            environment::define(&env, token.lexeme(), loxtype.clone())
         }
 
         // Execute function and return its (optional) return value
