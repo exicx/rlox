@@ -573,11 +573,6 @@ impl Parser {
     }
 }
 
-// Print the AST nodes
-pub fn print_ast() {
-    todo!()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

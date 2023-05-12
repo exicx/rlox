@@ -19,7 +19,6 @@ use std::error::Error;
 use std::fs::File;
 use std::io::{self, Write};
 
-use log::debug;
 use rlox::errors::{ParseError, RloxError};
 use rlox::interpreter::Interpreter;
 use rlox::scanner::Scanner;
@@ -32,7 +31,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     match cmdline.len() {
         // Too many arguments
         len if len > 2 => {
-            eprintln!("Usage: jlox [script]");
+            log::error!("Usage: jlox [script]");
             return Err(Box::new(RloxError::Cmdline(
                 "Too many arguments.".to_string(),
             )));
@@ -52,7 +51,7 @@ fn run(interpreter: &mut Interpreter, input: &str) -> Result<(), RloxError> {
     let mut scanner = Scanner::new();
     scanner.scan_tokens(input)?;
 
-    debug!("{:?}", scanner);
+    log::debug!("{:?}", scanner);
 
     // Parse the input and evaluate expressions
     let program = scanner.into_parser().parse();
@@ -60,7 +59,7 @@ fn run(interpreter: &mut Interpreter, input: &str) -> Result<(), RloxError> {
     // Print all errors we've found from parsing
     for res in &program {
         if let Err(err) = res {
-            println!("{}", err);
+            log::error!("{}", err);
         }
     }
     let has_error = program.iter().any(|i| i.is_err());
@@ -77,10 +76,13 @@ fn run(interpreter: &mut Interpreter, input: &str) -> Result<(), RloxError> {
     // debugging
     if let Ok(program) = &program {
         for stmt in program {
-            debug!("{:?}", stmt);
+            log::debug!("{:?}", stmt);
         }
     }
 
+    // Semantic Analysis
+
+    // Interpret
     interpreter.interpret(program?)
 }
 
@@ -122,7 +124,7 @@ fn run_prompt() -> Result<(), Box<dyn Error>> {
         // Run user's input
         // Don't kill the user's session if they make a mistake.
         if let Err(err) = run(&mut interpreter, &buf) {
-            println!("{err}");
+            log::error!("{err}");
         }
     }
 

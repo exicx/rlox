@@ -18,8 +18,6 @@ use std::fmt::{Debug, Display};
 use std::rc::Rc;
 use std::time::SystemTime;
 
-use log::debug;
-
 use super::environment::{self, RfEnv};
 use super::{Interpreter, LoxType};
 use crate::errors::Result;
@@ -65,7 +63,7 @@ impl Callable for LoxFunction {
 
     fn call(&self, interpreter: &mut Interpreter, arguments: &[LoxType]) -> Result<LoxType> {
         assert_eq!(self.params.len(), arguments.len());
-        debug!("calling: {}", self.name);
+        log::trace!("calling: {}", self.name);
 
         // Zip up arguments and their results
         // Bind each value to its name in the new environment

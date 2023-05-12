@@ -1,7 +1,7 @@
 [package]
 name = "rlox"
 authors = ["James Smyle <j@mes.sh>"]
-version = "0.10.0"
+version = "0.11.0"
 edition = "2021"
 description = "rlox: interpreter/compiler of the lox language"
 readme = "README.md"

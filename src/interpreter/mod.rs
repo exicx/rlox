@@ -18,6 +18,7 @@ mod callable; // Traits for callable objects (functions, classes, lambdas)
 mod environment; // Call stack
 mod loxreturn;
 mod loxtype;
+mod semanticanalysis;
 
 use std::rc::Rc;
 
@@ -28,6 +29,7 @@ use callable::{Callable, FfiClock, FfiPrint, LoxFunction};
 use environment::RfEnv;
 use loxreturn::Return;
 use loxtype::LoxType;
+use semanticanalysis::Resolver;
 
 pub struct Interpreter {
     global: RfEnv,
@@ -55,6 +57,10 @@ impl Interpreter {
     //
 
     pub fn interpret(&mut self, program: Vec<Stmt>) -> Result<()> {
+        // TODO: add semantic analysis before execution.
+
+        let program = Resolver::new(program).resolve();
+
         for statement in program {
             self.execute(statement)?;
             // we don't need the Return() type here, only inside

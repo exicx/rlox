@@ -380,6 +380,7 @@ mod tests {
             var jonny = 3;
             if (andy and jonny) { print("Hello World" + (andy+jonny)); };
             "#;
+        // this actually isn't valid Lox, but it'll still scan
 
         let mut scanner = Scanner::new();
         scanner.scan_tokens(input).unwrap();

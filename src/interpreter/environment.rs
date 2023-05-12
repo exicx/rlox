@@ -18,8 +18,6 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use log::debug;
-
 use crate::errors::{Result, RloxError, RuntimeError};
 
 use super::LoxType;
@@ -40,7 +38,7 @@ pub fn new_global() -> RfEnv {
 }
 
 pub fn from(env: &RfEnv) -> RfEnv {
-    debug!("from");
+    log::trace!("from");
     Rc::new(RefCell::new(Environment {
         parent: Some(Rc::clone(env)),
         env: HashMap::new(),
@@ -49,7 +47,7 @@ pub fn from(env: &RfEnv) -> RfEnv {
 
 // Drop the top-most scope, but never global
 pub fn drop(rfenv: &RfEnv) -> RfEnv {
-    debug!("dropping");
+    log::trace!("dropping");
 
     match rfenv.borrow().parent {
         None => Rc::clone(rfenv),
@@ -59,18 +57,18 @@ pub fn drop(rfenv: &RfEnv) -> RfEnv {
 
 // Define a new type
 pub fn define(env: &RfEnv, key: &str, val: LoxType) {
-    debug!("defining: {}", key);
+    log::trace!("defining: {}", key);
     env.borrow_mut().env.insert(key.to_string(), val);
 }
 
 // Return value if it exists, otherwise error
 // Recurses up call stack
 pub fn get(rfenv: &RfEnv, key: &str) -> Result<LoxType> {
-    debug!("getting: {}", key);
+    log::trace!("getting: {}", key);
 
     match rfenv.borrow().env.get(key) {
         None => {
-            debug!("  {} not found in this environment.", key);
+            log::trace!("  {} not found in this environment.", key);
             match rfenv.borrow().parent {
                 None => Err(RloxError::Interpret(RuntimeError::UndefinedVariable)),
                 Some(ref parent) => get(parent, key),
@@ -81,7 +79,7 @@ pub fn get(rfenv: &RfEnv, key: &str) -> Result<LoxType> {
 }
 
 pub fn assign(rfenv: &RfEnv, key: &str, val: LoxType) -> Result<()> {
-    debug!("assigning: {}", key);
+    log::trace!("assigning: {}", key);
 
     // return error if variable isn't defined.
     get(rfenv, key).map_err(|_| RloxError::Interpret(RuntimeError::UndefinedVariableAssignment))?;
