@@ -21,6 +21,7 @@ use std::io::{self, Write};
 
 use rlox::errors::{ParseError, RloxError};
 use rlox::interpreter::Interpreter;
+use rlox::resolver::Resolver;
 use rlox::scanner::Scanner;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -48,11 +49,12 @@ fn main() -> Result<(), Box<dyn Error>> {
 // Scans, Parses, and evaluates input.
 fn run(interpreter: &mut Interpreter, input: &str) -> Result<(), RloxError> {
     // TODO: Clean this up.
+    // Lexical analysis
     let mut scanner = Scanner::new();
     scanner.scan_tokens(input)?;
+    log::trace!("{:?}", scanner);
 
-    log::debug!("{:?}", scanner);
-
+    // Syntactic analysis
     // Parse the input and evaluate expressions
     let program = scanner.into_parser().parse();
 
@@ -62,6 +64,8 @@ fn run(interpreter: &mut Interpreter, input: &str) -> Result<(), RloxError> {
             log::error!("{}", err);
         }
     }
+
+    // Exit if we've found any errors
     let has_error = program.iter().any(|i| i.is_err());
     if has_error {
         return Err(RloxError::Parse(ParseError::ParseFailure(
@@ -72,18 +76,19 @@ fn run(interpreter: &mut Interpreter, input: &str) -> Result<(), RloxError> {
     // Collect just the successful parses.
     // This is either everything, or nothing. Because we exited in the last step
     let program: Result<Vec<_>, RloxError> = program.into_iter().collect();
-
-    // debugging
-    if let Ok(program) = &program {
-        for stmt in program {
-            log::debug!("{:?}", stmt);
-        }
-    }
+    let mut program = program?;
 
     // Semantic Analysis
 
+    Resolver::new().resolver(&mut program)?;
+
+    // debugging
+    for stmt in &program {
+        log::debug!("{:?}", stmt);
+    }
+
     // Interpret
-    interpreter.interpret(program?)
+    interpreter.interpret(program)
 }
 
 // Reads a file in and runs it.

@@ -61,6 +61,10 @@ impl Callable for LoxFunction {
         self.params.len() as u8
     }
 
+    // the function defintion stores its parameters.
+    // we pass in the evaluated arguments when the function is called.
+    // the parameters and arguments are zipped up, and each argument is bound to the
+    // parameter name from the function defintion in the function's environment.
     fn call(&self, interpreter: &mut Interpreter, arguments: &[LoxType]) -> Result<LoxType> {
         assert_eq!(self.params.len(), arguments.len());
         log::trace!("calling: {}", self.name);

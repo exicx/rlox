@@ -1,3 +1,3 @@
 // Your first lox program
-print "Hello, World!"; /////
-print 10051.222134 + 1001.414 * 34.1 / 17.991;
+print("Hello, World!"); /////
+print(10051.222134 + 1001.414 * 34.1 / 17.991);

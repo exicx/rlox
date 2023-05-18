@@ -25,11 +25,8 @@ pub enum LoxType {
     Number(f64),
     String(String),
     Fun(LoxFunction),
-    Clock(FfiClock), // Make this more generic so we can define more native FFI
+    Clock(FfiClock),
     Print(FfiPrint),
-    // Fun(Box<dyn Callable>),
-    // Class(Box<dyn Callable>),
-    // Ffi(Box<dyn Callable>),
     Nil,
 }
 

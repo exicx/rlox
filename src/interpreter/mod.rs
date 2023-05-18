@@ -18,18 +18,16 @@ mod callable; // Traits for callable objects (functions, classes, lambdas)
 mod environment; // Call stack
 mod loxreturn;
 mod loxtype;
-mod semanticanalysis;
 
 use std::rc::Rc;
 
 use crate::errors::{Result, RloxError, RuntimeError};
 use crate::parser::ast::{Expr, ExprLiteral, Stmt};
-use crate::scanner::TokenType;
+use crate::scanner::{Token, TokenType};
 use callable::{Callable, FfiClock, FfiPrint, LoxFunction};
 use environment::RfEnv;
 use loxreturn::Return;
 use loxtype::LoxType;
-use semanticanalysis::Resolver;
 
 pub struct Interpreter {
     global: RfEnv,
@@ -57,10 +55,6 @@ impl Interpreter {
     //
 
     pub fn interpret(&mut self, program: Vec<Stmt>) -> Result<()> {
-        // TODO: add semantic analysis before execution.
-
-        let program = Resolver::new(program).resolve();
-
         for statement in program {
             self.execute(statement)?;
             // we don't need the Return() type here, only inside
@@ -108,7 +102,10 @@ impl Interpreter {
                 }
             }
             Stmt::Fun(ident, params, body) => {
-                let fun = LoxFunction::new(&ident, params, body, environment::from(&self.env));
+                // functions create a new environment scope to capture their environment.
+                // the new scope it stored as part of the function definition.
+                let closure = environment::from(&self.env);
+                let fun = LoxFunction::new(&ident, params, body, closure);
                 environment::define(&self.env, &ident, LoxType::Fun(fun));
             }
             // TODO: Use token to improve interpreter error messages.
@@ -154,20 +151,29 @@ impl Interpreter {
                 ExprLiteral::Number(n) => Ok(LoxType::Number(n)),
                 ExprLiteral::String(ls) => Ok(LoxType::String(ls)),
             },
-            Expr::Variable(ident) => {
+            Expr::Variable(ident, depth) => {
                 // Accessing a variable.
-                Ok(environment::get(&Rc::clone(&self.env), &ident)?)
+                match depth {
+                    None => Ok(environment::get(&self.env, &ident)?),
+                    Some(depth) => Ok(environment::get_n(&self.env, &ident, depth)?),
+                }
             }
             // Recursively evaluate grouping's subexpressions.
             Expr::Grouping(group) => self.evaluate(*group),
             Expr::Unary(token, expr) => self.unary(token, *expr),
             Expr::Binary(expr1, token, expr2) => self.binary(*expr1, token, *expr2),
-            Expr::Assign(ident, expr) => {
+            Expr::Assign(ident, expr, depth) => {
                 // Try to evaluate the r-value
                 let exprres = self.evaluate(*expr)?;
-                // TODO: This clone() is really gross.
+
                 // Assign r-value to l-value
-                environment::assign(&self.env, &ident, exprres.clone())?;
+                match depth {
+                    None => environment::assign(&self.env, &ident, exprres.clone())?,
+                    Some(depth) => {
+                        environment::assign_n(&self.env, &ident, exprres.clone(), depth)?
+                    }
+                }
+
                 Ok(exprres)
             }
             Expr::Logical(left, operator, right) => {

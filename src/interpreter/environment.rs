@@ -55,16 +55,44 @@ pub fn drop(rfenv: &RfEnv) -> RfEnv {
     }
 }
 
+fn ancestor(rfenv: RfEnv, depth: u32) -> RfEnv {
+    if depth == 0 {
+        return Rc::clone(&rfenv);
+    }
+
+    let binding = rfenv.borrow();
+    let parent = match &binding.parent {
+        Some(parent) => parent,
+        None => {
+            panic!("depth is >1, but we're already at the root env");
+        }
+    };
+    ancestor(Rc::clone(parent), depth - 1)
+}
+
 // Define a new type
 pub fn define(env: &RfEnv, key: &str, val: LoxType) {
     log::trace!("defining: {}", key);
     env.borrow_mut().env.insert(key.to_string(), val);
 }
 
+pub fn get_n(rfenv: &RfEnv, key: &str, depth: u32) -> Result<LoxType> {
+    log::trace!("fast get: {}", key);
+
+    let parent = ancestor(Rc::clone(rfenv), depth);
+    assert!(parent.borrow().env.contains_key(key));
+
+    let binding = parent.borrow();
+    match binding.env.get(key) {
+        None => unreachable!(),
+        Some(val) => Ok(val.clone()),
+    }
+}
+
 // Return value if it exists, otherwise error
 // Recurses up call stack
 pub fn get(rfenv: &RfEnv, key: &str) -> Result<LoxType> {
-    log::trace!("getting: {}", key);
+    log::trace!("slow getting: {}", key);
 
     match rfenv.borrow().env.get(key) {
         None => {
@@ -78,8 +106,21 @@ pub fn get(rfenv: &RfEnv, key: &str) -> Result<LoxType> {
     }
 }
 
+pub fn assign_n(rfenv: &RfEnv, key: &str, val: LoxType, depth: u32) -> Result<()> {
+    log::trace!("fast assign: {} -> {}", key, val);
+
+    let parent = ancestor(Rc::clone(rfenv), depth);
+
+    get(&parent, key)
+        .map_err(|_| RloxError::Interpret(RuntimeError::UndefinedVariableAssignment))?;
+
+    parent.borrow_mut().env.insert(key.to_string(), val);
+
+    Ok(())
+}
+
 pub fn assign(rfenv: &RfEnv, key: &str, val: LoxType) -> Result<()> {
-    log::trace!("assigning: {}", key);
+    log::trace!("slow assigning: {} -> {}", key, val);
 
     // return error if variable isn't defined.
     get(rfenv, key).map_err(|_| RloxError::Interpret(RuntimeError::UndefinedVariableAssignment))?;
@@ -154,7 +195,6 @@ mod tests {
     #[test]
     fn test_nested_get() {
         let root = new_global();
-        let global = Rc::clone(&root);
         define(&root, "name1", LoxType::Bool(true));
         define(&root, "name2", LoxType::Bool(false));
 

@@ -42,9 +42,12 @@ impl ScanError {
 pub enum ParseError {
     ParseFailure(String),
     UnexpectedToken(String),
-    TooManyArguments,
+    TooManyParameters,
     EOF,
 }
+
+#[derive(Debug, PartialEq)]
+pub enum ResolverError {}
 
 #[derive(Debug, PartialEq)]
 pub enum RuntimeError {
@@ -62,6 +65,7 @@ pub enum RloxError {
     Cmdline(String),
     Scan(ScanError),
     Parse(ParseError),
+    Resolver(ResolverError),
     Interpret(RuntimeError),
 }
 
@@ -79,6 +83,9 @@ impl fmt::Display for RloxError {
                 )
             }
             Self::Parse(err) => {
+                write!(f, "{err:?}")
+            }
+            Self::Resolver(err) => {
                 write!(f, "{err:?}")
             }
             Self::Interpret(err) => {

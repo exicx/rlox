@@ -18,6 +18,14 @@
 // It's used for Binary operations: +, -, /, * and Unary: -, !.
 use crate::scanner::{Token, TokenType};
 
+// Depth of this variable's usage in the call stack.
+// Used for quick lookups in interpreter::environment,
+// and set via the semantic analysis pass: resolver.
+type EnvDepth = u32;
+
+// TODO: Replace String and TokenType types with Token.
+// Give `Token`s to the interpreter to print better error messages.
+
 #[derive(Debug, Clone)]
 pub enum Stmt {
     Block(Vec<Stmt>), // {}
@@ -33,20 +41,20 @@ pub enum Stmt {
         Option<Box<Stmt>>, // optional else statement
     ),
     Return(Token, Option<Expr>), // return a;
-    Var(String, Option<Expr>),   // var declaration
+    Var(String, Option<Expr>),   // "var" x (= 10)? ;
     While(Expr, Box<Stmt>),      // while (true) { do_thing(); }
 }
 
 #[derive(Debug, Clone)]
 pub enum Expr {
-    Assign(String, Box<Expr>),                // a = 10;
-    Binary(Box<Expr>, TokenType, Box<Expr>),  // a + a
-    Call(Box<Expr>, Token, Vec<Expr>),        // doSomething();
-    Grouping(Box<Expr>),                      // (a)
-    Literal(ExprLiteral),                     // 3.0, "", false
-    Logical(Box<Expr>, TokenType, Box<Expr>), // false or "10"
-    Unary(TokenType, Box<Expr>),              // -a, !true
-    Variable(String),                         // r-value
+    Assign(String, Box<Expr>, Option<EnvDepth>), // a = 10;
+    Binary(Box<Expr>, TokenType, Box<Expr>),     // a + a
+    Call(Box<Expr>, Token, Vec<Expr>),           // doSomething();
+    Grouping(Box<Expr>),                         // (a)
+    Literal(ExprLiteral),                        // 3.0, "", false
+    Logical(Box<Expr>, TokenType, Box<Expr>),    // false or "10"
+    Unary(TokenType, Box<Expr>),                 // -a, !true
+    Variable(String, Option<EnvDepth>),          // r-value
 }
 
 #[derive(Debug, Clone)]

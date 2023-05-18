@@ -5,15 +5,15 @@
 var start;
 
 fun start_bench() {
-  print "Starting benchmark.";
+  print("Starting benchmark.");
   start = clock();
 }
 
 fun end_bench() {
-  print "Ending benchmark.";
+  print("Ending benchmark.");
   var result = clock() - start;
-  print result;
-  print "seconds";
+  print(result);
+  print("seconds");
 }
 
 fun fib(limit) {

@@ -87,7 +87,7 @@ pub struct Token {
     lexeme: String,
     literal: TokenLiteral, // parsed value of lexeme
     line: usize,           // line number where token was found
-    position: usize,       // character position within file
+    position: usize,       // character position within line
 }
 
 impl Token {

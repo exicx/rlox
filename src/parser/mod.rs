@@ -100,7 +100,7 @@ impl Parser {
 
             if params.len() >= 255 {
                 // error if there's too many params
-                return Err(RloxError::Parse(ParseError::TooManyArguments));
+                return Err(RloxError::Parse(ParseError::TooManyParameters));
             }
 
             // add param identifier to list
@@ -155,6 +155,8 @@ impl Parser {
         }
     }
 
+    // block_stmt returns a vector of statements NOT enclosed within a
+    // stmt::block.
     fn block_stmt(&mut self) -> Result<Vec<Stmt>> {
         let mut stmts = vec![];
 
@@ -301,8 +303,8 @@ impl Parser {
         if self.is_any_tokens(&[TokenType::Equal]) {
             let value = self.assignment()?;
 
-            return if let Expr::Variable(name) = expr {
-                Ok(Expr::Assign(name, Box::new(value)))
+            return if let Expr::Variable(name, _) = expr {
+                Ok(Expr::Assign(name, Box::new(value), None))
             } else {
                 Err(RloxError::Parse(ParseError::ParseFailure(
                     "Invalid assignment target.".to_string(),
@@ -457,7 +459,7 @@ impl Parser {
 
         if self.is_any_tokens(&[TokenType::Identifier]) {
             if let TokenLiteral::Identifier(literal) = self.previous().token_literal().clone() {
-                return Ok(Expr::Variable(literal));
+                return Ok(Expr::Variable(literal, None));
             } else {
                 // Should not be reachable unless by programmer error in scanner.
                 panic!("Expected identifier");
@@ -557,7 +559,7 @@ impl Parser {
         if !self.check(TokenType::RightParen) {
             loop {
                 if arguments.len() >= 255 {
-                    return Err(RloxError::Parse(ParseError::TooManyArguments));
+                    return Err(RloxError::Parse(ParseError::TooManyParameters));
                 }
                 arguments.push(self.expression()?);
 
